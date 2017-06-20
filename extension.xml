@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+
+<root version="3.0">
+	<properties>
+		<name>StealthTracker - v1.0</name>
+		<version>1.0</version>
+		<author>Justin Freitas</author>
+		<description>For the current Combat Tracker actor, chat messages will display for each other CT actor whose tracked stealth roll is greater than the current actor's Passive Perception.  Stealth roll values are tracked in the CT actor name field using a suffixed syntax of a space followed by the letter 's' and the roll value (i.e. SomeActorName - s22 ).  Note, the dash is optional, but one or more space is mandatory.</description>
+		<ruleset>
+			<name>5E</name>
+		</ruleset>
+	</properties>
+	
+	<base>
+		<script name="StealthTracker" file="scripts/stealthtracker.lua" />
+		<icon name="stealth_icon" file="graphics/icons/stealth_icon.png" />
+	</base>
+</root>
