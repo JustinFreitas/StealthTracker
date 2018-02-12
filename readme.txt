@@ -1,4 +1,4 @@
-StealthTracker v1.2 by Justin Freitas
+StealthTracker v1.2.1 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -21,3 +21,4 @@ Future Enhancements:
 Changelist:
 v1.1 - The main purpose of the new version is to incorporate a chat command that displays all of the visible actors in the battle and WHO THEY CAN'T PERCEIVE.
 v1.2 - Added auto application of stealth rolls to the Character/CT sheet names, support for npc sheets shared to players, clearing of stealthtracker data (via clearing initiative in CT or by '/st clear'), fixes for all of the hidden actor scenarios where chat messages are secret when a hidden npc is involved, many general fixes and performance improvements.
+v1.2.1 - Bugfix for the substring search looking for the stealth roll.

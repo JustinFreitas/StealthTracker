@@ -18,7 +18,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = {sender = "", font = "emotefont", icon = "stealth_icon"}
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v1.2 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-18 Justin Freitas (2/7/18)"
+	msg.text = "StealthTracker v1.2.1 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-18 Justin Freitas (2/12/18)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 	
@@ -169,7 +169,7 @@ end
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the default handler, and finally finish up with more logic.
 function onRoll(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRoll(rSource, rTarget, rRoll))
-	local bProcessStealth = rSource and rRoll and string.find(rRoll.sDesc, "", 1, "[SKILL] Stealth")
+	local bProcessStealth = rSource and rRoll and string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true)
 	local nodeCreature, nActiveCTVisible
 	
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
