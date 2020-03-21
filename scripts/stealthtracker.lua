@@ -575,6 +575,7 @@ function processHostOnlySubcommands(sSubcommand)
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then
 			displayChatMessage("No active CT actor.", false, true)
+			return
 		end
 
 		local rSource = ActorManager.getActorFromCT(nodeActiveCT)
