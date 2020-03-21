@@ -121,8 +121,14 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	-- First, let's build a new table that has the strings as they are to be output in chat.
 	local aUnawareActorNamesAndPP = {}
 	for _, rActor in ipairs(aUnawareTargets) do
-		table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", rActor.sName, getPassivePerceptionNumber(rActor)))
+		local nPPActor = getPassivePerceptionNumber(rActor)
+		if nPPActor ~= nil then
+			table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", rActor.sName, getPassivePerceptionNumber(rActor)))
+		end
 	end
+
+	-- If the table is empty, just bail.
+	if #aUnawareActorNamesAndPP == 0 then return end
 
 	-- Now, let's display a summary message and append the output strings from above appended to the end.
 	local sChatMessage = string.format("'%s' is attacking from stealth (Stealth: %d) but did not specify a target. The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s", sSourceName, nStealthSource, table.concat(aUnawareActorNamesAndPP, "\r"))
@@ -132,7 +138,7 @@ end
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
 function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
-	return nAttackerStealth and rTarget and nPPTarget >= nAttackerStealth
+	return nAttackerStealth and rTarget and nPPTarget ~= nil and nPPTarget >= nAttackerStealth
 end
 
 	-- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
