@@ -297,7 +297,7 @@ function isTargetHiddenFromSource(rSource, rTarget)
 	local nStealthTarget = getStealthNumberFromEffects(DB.findNode(rTarget.sCTNode))
 	if nStealthTarget then
 		local nPPSource = getPassivePerceptionNumber(rSource)
-		if nPPSource < nStealthTarget then
+		if nPPSource ~= nil and nPPSource < nStealthTarget then
 			local rHiddenActor = {
 				source = rSource,
 				target = rTarget,
@@ -521,7 +521,7 @@ end
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
-	if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+	if nPPTarget ~= nil and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 		-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
 		local sMsgText = string.format("Attacker is hidden from target. Advantage? ('%s' Passive Perception: %d, '%s' Stealth: %d).", rTarget.sName, nPPTarget, rSource.sName, nStealthSource)
 		displayChatMessage(sMsgText)
