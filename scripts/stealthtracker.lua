@@ -50,7 +50,6 @@ end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
 
--- TODO: Refactor this function to separate the checking from the chat output, so that we can have single messages displayed instead of multiple from StealthTracker.  The problem with this is that some of the hidden people should be host only secrets.  Should we go as far as having a public and secret list?  Is it worth the effort?  If not, we can leave it as is.
 -- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
 function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 	local rCurrentActor = ActorManager.getActorFromCT(nodeCTSource)
@@ -69,7 +68,6 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 		if rCurrentActor.sCTNode ~= rIterationActor.sCTNode then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
-				-- TODO: Should we just hide PP altogether for NPCs to not give away any secrets?
 				-- Finish creating the message (with text and secret flag), then post it to chat.
 				local sText = string.format("'%s' DOES NOT PERCEIVE '%s' due to being hidden (pp=%d vs. stealth=%d).", rHiddenTarget.source.sName, rIterationActor.sName, rHiddenTarget.sourcePP, rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
@@ -573,8 +571,6 @@ function processHostOnlySubcommands(sSubcommand)
 		return
 	end
 
-	-- TODO: Do we want this local message to display for the GM at the start of everyone's turn instead of in a command?
-	-- TODO: Refactor to reduce number of display calls.
 	-- Command to display unaware targets
 	if sSubcommand == "unaware" then
 		-- Get the stealth for the current actor.
@@ -592,7 +588,7 @@ function processHostOnlySubcommands(sSubcommand)
 			return
 		end
 		if #aUnawareTargets == 0 then
-			displayChatMessage("No unaware targets found", false, true)
+			displayChatMessage("No unaware targets found.", false, true)
 			return
 		end
 
