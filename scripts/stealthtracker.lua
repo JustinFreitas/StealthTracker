@@ -1,6 +1,6 @@
 --
--- (c) Copyright Justin Freitas 2018+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2018 SmiteWorks USA LLC.
+-- (c) Copyright Justin Freitas 2020+ except where explicitly stated otherwise.
+-- Fantasy Grounds is Copyright (c) 2004-2020 SmiteWorks USA LLC.
 -- Copyright to other material within this file may be held by other Individuals and/or Entities.
 -- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
 -- transmitted or otherwise manipulated in ANY way without the explicit written consent of
@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.0 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-18 Justin Freitas (5/31/18)"
+	msg.text = "StealthTracker v2.0 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-20 Justin Freitas (3/21/20)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
