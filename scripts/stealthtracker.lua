@@ -139,7 +139,7 @@ function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
 	return nAttackerStealth and rTarget and nPPTarget ~= nil and nPPTarget >= nAttackerStealth
 end
 
-	-- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
+-- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 function expireStealthEffectOnCTNode(nodeCT)
 	local aSortedCTNodes = getOrderedEffectsTableFromCTNode(nodeCT)
 	local nodeLastEffectWithStealth
