@@ -1,6 +1,6 @@
 --
--- (c) Copyright Justin Freitas 2020+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2020 SmiteWorks USA LLC.
+-- (c) Copyright Justin Freitas 2021+ except where explicitly stated otherwise.
+-- Fantasy Grounds is Copyright (c) 2004-2021 SmiteWorks USA LLC.
 -- Copyright to other material within this file may be held by other Individuals and/or Entities.
 -- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
 -- transmitted or otherwise manipulated in ANY way without the explicit written consent of
@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.0 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-20 Justin Freitas (3/21/20)"
+	msg.text = "StealthTracker v2.1 for Fantasy Grounds v3.X, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (2/27/21)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
@@ -208,7 +208,7 @@ function getPassivePerceptionNumber(rActor)
 	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort.
 	if not nPP then
 		-- If senses/passive Perception isn't available, calculate from 10 + wis.  This code assumes the 5E ruleset items utilized will be there.
-		nPP = 10 + ActorManager2.getAbilityBonus(rCreatureNode, "wisdom")
+		nPP = 10 + ActorManager5E.getAbilityBonus(rCreatureNode, "wisdom")
 	end
 
 	return nPP
