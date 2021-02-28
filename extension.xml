@@ -2,8 +2,9 @@
 
 <root version="3.0">
 	<properties>
-		<name>StealthTracker - v2.0</name>
-		<version>2.0</version>
+		<name>StealthTracker - v2.1</name>
+		<version>2.1</version>
+		<loadorder>79</loadorder>
 		<author>Justin Freitas</author>
 		<description>For the current Combat Tracker actor, chat messages will display for each other CT actor whose tracked stealth roll is greater than the current actor's Passive Perception.  Stealth roll values are tracked in the CT actor node via an effect.  This effect will be automatically added/updated on a Stealth roll (always for GM and only when it's a player's turn for them).</description>
 		<ruleset>
