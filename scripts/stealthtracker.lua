@@ -551,6 +551,29 @@ function processChatCommand(sCommand, sParams)
 	end
 end
 
+function displayUnawareTargetsForCurrentCTActor()
+	-- Get the stealth for the current actor.
+	local nodeActiveCT = CombatManager.getActiveCT()
+	if not nodeActiveCT then
+		displayChatMessage("No active CT actor.", false, true)
+		return
+	end
+
+	local rSource = ActorManager.getActorFromCT(nodeActiveCT)
+	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
+	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
+	if not nStealthSource then
+		displayChatMessage("Current CT actor is not stealthing.", false, true)
+		return
+	end
+	if #aUnawareTargets == 0 then
+		displayChatMessage("No unaware targets found.", false, true)
+		return
+	end
+
+	displayUnawareCTTargetsWithFormatting(rSource.sName, nStealthSource, aUnawareTargets)
+end
+
 -- Chat commands that are for host only
 function processHostOnlySubcommands(sSubcommand)
 	-- Default/empty subcommand - What does the current CT actor not perceive?
@@ -559,6 +582,7 @@ function processHostOnlySubcommands(sSubcommand)
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
 		checkCTNodeForHiddenActors(nodeActiveCT, true)
+		displayUnawareTargetsForCurrentCTActor()
 		return
 	end
 
@@ -570,32 +594,7 @@ function processHostOnlySubcommands(sSubcommand)
 		displayChatMessage("clear command complete", false, true)
 		return
 	end
-
-	-- Command to display unaware targets
-	if sSubcommand == "unaware" then
-		-- Get the stealth for the current actor.
-		local nodeActiveCT = CombatManager.getActiveCT()
-		if not nodeActiveCT then
-			displayChatMessage("No active CT actor.", false, true)
-			return
-		end
-
-		local rSource = ActorManager.getActorFromCT(nodeActiveCT)
-		local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
-		local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
-		if not nStealthSource then
-			displayChatMessage("Current CT actor is not stealthing.", false, true)
-			return
-		end
-		if #aUnawareTargets == 0 then
-			displayChatMessage("No unaware targets found.", false, true)
-			return
-		end
-
-		displayUnawareCTTargetsWithFormatting(rSource.sName, nStealthSource, aUnawareTargets)
-		return
-	end
-
+	
 	-- Fallthrough/unrecognized subcommand
 	return sSubcommand
 end
@@ -639,6 +638,6 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal, sUser)
 end
 
 -- Function to serve as a ternary operator (i.e. cond ? T : F)
-function ternary ( cond , T , F )
+function ternary(cond, T, F)
 	if cond then return T else return F end
 end
