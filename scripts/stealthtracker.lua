@@ -493,9 +493,9 @@ function onRollSkill(rSource, rTarget, rRoll)
 	if not nodeCreature then return end
 	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
 
-	-- To alter the creature name record, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
+	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
 	if rSource.sCTNode ~= '' and nodeActiveCT and rRoll.aDice[1] and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
-		-- Calculate the stealth roll so that it's available to put in the creature name.  After the default ActionSkill.onRoll() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
+		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRoll() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
 		local nStealthTotal = rRoll.aDice[1].result + rRoll.nMod
 
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
