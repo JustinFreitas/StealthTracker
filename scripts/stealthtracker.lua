@@ -512,14 +512,8 @@ end
 function onTurnStartEvent(nodeEntry)
 	-- Do the broadcast of the actors that are hidden to the current actor.
 	checkCTNodeForHiddenActors(nodeEntry, false)
-
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
-	local rSource = ActorManager.getActorFromCT(nodeEntry)
-	local nStealthSource = getStealthNumberFromEffects(nodeEntry)
-	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
-	if rSource and nStealthSource and #aUnawareTargets > 0 then
-		displayUnawareCTTargetsWithFormatting(rSource.sName, nStealthSource, aUnawareTargets)
-	end
+	displayUnawareTargetsForCurrentCTActor()
 end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
