@@ -17,6 +17,7 @@ Known Limitations:
 
 Future Enhancements:
 - Consider removing or making optional the restriction that a player can only update the PC or NPC they are controlling when it's that actor's turn in the CT.
+- Consider adding 'Stealth+0' to the Skills of NPCs if it doesn't exist to make their skill checks easier to process.  Or in a more complex case, have a custom stealth button on the sheet.
 
 Changelist:
 - v1.1 - The main purpose of the new version is to incorporate a chat command that displays all of the visible actors in the battle and WHO THEY CAN'T PERCEIVE.
