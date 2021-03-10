@@ -52,7 +52,7 @@ end
 
 -- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
 function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
-	local rCurrentActor = ActorManager.getActorFromCT(nodeCTSource)
+	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
 	if not rCurrentActor then return end
 
 	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
@@ -63,7 +63,7 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
-		local rIterationActor = ActorManager.getActorFromCT(nodeCT)
+		local rIterationActor = ActorManager.resolveActor(nodeCT)
 		-- Compare the CT node ID (unique) instead of the name to prevent duplicate friendly names causing problems.
 		if rCurrentActor.sCTNode ~= rIterationActor.sCTNode then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
@@ -264,7 +264,7 @@ function getUnawareCTTargetsGivenSource(rSource)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
-		local rActor = ActorManager.getActorFromCT(nodeCT)
+		local rActor = ActorManager.resolveActor(nodeCT)
 		if not isTargetHiddenFromSource(rSource, rActor) and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rActor) then
 			table.insert(aUnawareTargets, rActor)
 		end
@@ -281,8 +281,8 @@ function handleAttackFromStealth(msgOOB)
 		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 		msgOOB.nSourceStealth = tonumber(msgOOB.nSourceStealth)
 		local nodeSourceCT = DB.findNode(msgOOB.sSourceCTNode)
-		local rSource = ActorManager.getActorFromCT(nodeSourceCT)
-		local rTarget = ActorManager.getActorFromCT(DB.findNode(msgOOB.sTargetCTNode))
+		local rSource = ActorManager.resolveActor(nodeSourceCT)
+		local rTarget = ActorManager.resolveActor(DB.findNode(msgOOB.sTargetCTNode))
 
 		performAttackFromStealth(rSource, rTarget, msgOOB.nSourceStealth)
 	end
@@ -384,7 +384,7 @@ function onRollAttack(rSource, rTarget, rRoll)
 	if not rSource then
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if nodeActiveCT then
-			rSource = ActorManager.getActorFromCT(nodeActiveCT)
+			rSource = ActorManager.resolveActor(nodeActiveCT)
 		end
 	end
 
@@ -400,7 +400,7 @@ function onRollAttack(rSource, rTarget, rRoll)
 		local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 		-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 		for _,nodeCT in ipairs(lCombatTrackerActors) do
-			local rActor = ActorManager.getActorFromCT(nodeCT)
+			local rActor = ActorManager.resolveActor(nodeCT)
 			if not CombatManager.isCTHidden(nodeCT) and rSource.sCTNode ~= rActor.sCTNode then
 				local rHiddenTarget = isTargetHiddenFromSource(rSource, rActor)
 				if rHiddenTarget then
@@ -568,7 +568,7 @@ function displayUnawareTargetsForCurrentCTActor()
 		return
 	end
 
-	local rSource = ActorManager.getActorFromCT(nodeActiveCT)
+	local rSource = ActorManager.resolveActor(nodeActiveCT)
 	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
 	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
 	if not nStealthSource then
