@@ -608,7 +608,7 @@ function processHostOnlySubcommands(sSubcommand)
 		displayChatMessage("clear command complete", false, true)
 		return
 	end
-	
+
 	-- Fallthrough/unrecognized subcommand
 	return sSubcommand
 end
