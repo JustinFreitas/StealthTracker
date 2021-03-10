@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v2.1 by Justin Freitas
+StealthTracker v2.2 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -25,5 +25,6 @@ Changelist:
 - v1.3 - Added the ability to drag stealth rolls from the chat to a CT actor for name update with stealth value from roll.  This works only for host/DM and it can be dropped on any character (no name validation). Added checks on attack to see if the attacker can see the target (is attack even possible?) and to see if the target can see the attacker (ADVATK).
 - v2.0 - This was a major change to move from tracking stealth in the actor's name to tracking stealth in the actor's effects list.  This helped to eliminate several limitations that were a side effect of overloading the actor name field.
 - v2.1 - Update to account for 3.3.13.
+- v2.2 - Deprecation updates.  Addition of current CT actor name to the 'not stealthing' message for clarity. Update to account for 3.3.14.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)

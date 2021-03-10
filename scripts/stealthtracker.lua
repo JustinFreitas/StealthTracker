@@ -133,7 +133,10 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	if #aUnawareActorNamesAndPP == 0 then return end
 
 	-- Now, let's display a summary message and append the output strings from above appended to the end.
-	local sChatMessage = string.format("'%s' is attacking from stealth (Stealth: %d) but did not specify a target. The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s", sSourceName, nStealthSource, table.concat(aUnawareActorNamesAndPP, "\r"))
+	local sChatMessage = string.format("'%s' is attacking from stealth (Stealth: %d) but did not specify a target. The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
+										sSourceName,
+										nStealthSource,
+										table.concat(aUnawareActorNamesAndPP, "\r"))
 	displayChatMessage(sChatMessage, false, true)
 end
 
