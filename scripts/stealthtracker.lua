@@ -140,6 +140,31 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	displayChatMessage(sChatMessage, false, true)
 end
 
+function displayUnawareTargetsForCurrentCTActor()
+	-- Get the stealth for the current actor.
+	local nodeActiveCT = CombatManager.getActiveCT()
+	if not nodeActiveCT then
+		displayChatMessage("No active CT actor.", false, true)
+		return
+	end
+
+	local rSource = ActorManager.resolveActor(nodeActiveCT)
+	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
+	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
+	if not nStealthSource then
+		local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
+													ActorManager.getDisplayName(rSource))
+		displayChatMessage(sActorNotStealthing, false, true)
+		return
+	end
+	if #aUnawareTargets == 0 then
+		displayChatMessage("No unaware targets found.", false, true)
+		return
+	end
+
+	displayUnawareCTTargetsWithFormatting(ActorManager.getDisplayName(rSource), nStealthSource, aUnawareTargets)
+end
+
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
 function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
@@ -561,31 +586,6 @@ function processChatCommand(sCommand, sParams)
 	if sFailedSubcommand then
 		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, false, true)
 	end
-end
-
-function displayUnawareTargetsForCurrentCTActor()
-	-- Get the stealth for the current actor.
-	local nodeActiveCT = CombatManager.getActiveCT()
-	if not nodeActiveCT then
-		displayChatMessage("No active CT actor.", false, true)
-		return
-	end
-
-	local rSource = ActorManager.resolveActor(nodeActiveCT)
-	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
-	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
-	if not nStealthSource then
-		local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
-													ActorManager.getDisplayName(rSource))
-		displayChatMessage(sActorNotStealthing, false, true)
-		return
-	end
-	if #aUnawareTargets == 0 then
-		displayChatMessage("No unaware targets found.", false, true)
-		return
-	end
-
-	displayUnawareCTTargetsWithFormatting(ActorManager.getDisplayName(rSource), nStealthSource, aUnawareTargets)
 end
 
 -- Chat commands that are for host only
