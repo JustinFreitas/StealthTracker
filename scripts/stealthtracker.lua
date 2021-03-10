@@ -69,7 +69,11 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				-- Finish creating the message (with text and secret flag), then post it to chat.
-				local sText = string.format("'%s' DOES NOT PERCEIVE '%s' due to being hidden (pp=%d vs. stealth=%d).", rHiddenTarget.source.sName, rIterationActor.sName, rHiddenTarget.sourcePP, rHiddenTarget.stealth)
+				local sText = string.format("'%s' DOES NOT PERCEIVE '%s' due to being hidden (pp=%d vs. stealth=%d).",
+											ActorManager.getDisplayName(rHiddenTarget.source),
+											ActorManager.getDisplayName(rIterationActor),
+											rHiddenTarget.sourcePP,
+											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
 				local bSecret = (rCurrentActor.sType == 'npc' and CombatManager.isCTHidden(nodeCTSource)) or CombatManager.isCTHidden(nodeCT)
@@ -121,7 +125,7 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	for _, rActor in ipairs(aUnawareTargets) do
 		local nPPActor = getPassivePerceptionNumber(rActor)
 		if nPPActor ~= nil then
-			table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", rActor.sName, getPassivePerceptionNumber(rActor)))
+			table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", ActorManager.getDisplayName(rActor), getPassivePerceptionNumber(rActor)))
 		end
 	end
 
@@ -179,7 +183,7 @@ function getPassivePerceptionNumber(rActor)
 	-- If creature node wasn't fetched, display local error and return nil.
 	if not rCreatureNode then
 		-- Display a secret, local error message.
-		displayChatMessage("Error getting passive perception for: " .. rActor.sName, true, true)
+		displayChatMessage("Error getting passive perception for: " .. ActorManager.getDisplayName(rActor), true, true)
 		return nil
 	end
 
@@ -412,13 +416,17 @@ function onRollAttack(rSource, rTarget, rRoll)
 			local aHiddenActorNamesAndStealth = {}
 			local nSourcePP
 			for _,rHiddenTarget in ipairs(aHiddenTargets) do
-				table.insert(aHiddenActorNamesAndStealth, string.format("'%s' - Stealth: %d", rHiddenTarget.target.sName, rHiddenTarget.stealth))
+				table.insert(aHiddenActorNamesAndStealth, string.format("'%s' - Stealth: %d", ActorManager.getDisplayName(rHiddenTarget.target), rHiddenTarget.stealth))
 				-- Only populate the nSourcePP once for use in the format msg.
 				if not nSourcePP then
 					nSourcePP = rHiddenTarget.sourcePP
 				end
 			end
-			local sChatMessage = string.format("An attack was made by '%s' that had no target. The following Combat Tracker actors are hidden from '%s', who has a Passive Perception of %d:\r\r%s", rSource.sName, rSource.sName, nSourcePP, table.concat(aHiddenActorNamesAndStealth, "\r"))
+			local sChatMessage = string.format("An attack was made by '%s' that had no target. The following Combat Tracker actors are hidden from '%s', who has a Passive Perception of %d:\r\r%s",
+											   ActorManager.getDisplayName(rSource),
+											   ActorManager.getDisplayName(rSource),
+											   nSourcePP,
+											   table.concat(aHiddenActorNamesAndStealth, "\r"))
 			displayChatMessage(sChatMessage)
 		end
 
@@ -437,7 +445,10 @@ function onRollAttack(rSource, rTarget, rRoll)
 	if rHiddenTarget then
 		-- Warn the chat that the target might be hidden
 		local sMsgText = string.format("Target hidden from attacker. Attack possible? ('%s' Stealth: %d, '%s' Passive Perception: %d).",
-										rTarget.sName, rHiddenTarget.stealth, rSource.sName, rHiddenTarget.sourcePP)
+										ActorManager.getDisplayName(rTarget),
+										rHiddenTarget.stealth,
+										ActorManager.getDisplayName(rSource),
+										rHiddenTarget.sourcePP)
 		displayChatMessage(sMsgText)
 	end
 
@@ -521,7 +532,11 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
 	if nPPTarget ~= nil and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 		-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-		local sMsgText = string.format("Attacker is hidden from target. Advantage? ('%s' Passive Perception: %d, '%s' Stealth: %d).", rTarget.sName, nPPTarget, rSource.sName, nStealthSource)
+		local sMsgText = string.format("Attacker is hidden from target. Advantage? ('%s' Passive Perception: %d, '%s' Stealth: %d).",
+									   ActorManager.getDisplayName(rTarget),
+									   nPPTarget,
+									   ActorManager.getDisplayName(rSource),
+									   nStealthSource)
 		displayChatMessage(sMsgText)
 		-- An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 		expireStealthEffectOnCTNode(DB.findNode(rSource.sCTNode))
@@ -557,7 +572,9 @@ function displayUnawareTargetsForCurrentCTActor()
 	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
 	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
 	if not nStealthSource then
-		displayChatMessage("Current CT actor is not stealthing.", false, true)
+		local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
+													ActorManager.getDisplayName(rSource))
+		displayChatMessage(sActorNotStealthing, false, true)
 		return
 	end
 	if #aUnawareTargets == 0 then
@@ -565,7 +582,7 @@ function displayUnawareTargetsForCurrentCTActor()
 		return
 	end
 
-	displayUnawareCTTargetsWithFormatting(rSource.sName, nStealthSource, aUnawareTargets)
+	displayUnawareCTTargetsWithFormatting(ActorManager.getDisplayName(rSource), nStealthSource, aUnawareTargets)
 end
 
 -- Chat commands that are for host only
