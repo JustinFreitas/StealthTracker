@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.2 for Fantasy Grounds v3.3.14+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (3/10/21)"
+	msg.text = "StealthTracker v2.3 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (4/24/21)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
@@ -52,6 +52,8 @@ end
 
 -- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
 function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
+	if not nodeCTSource then return end
+
 	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
 	if not rCurrentActor then return end
 
@@ -61,11 +63,13 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 
 	-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
+	if not lCombatTrackerActors then return end
+
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
 		local rIterationActor = ActorManager.resolveActor(nodeCT)
 		-- Compare the CT node ID (unique) instead of the name to prevent duplicate friendly names causing problems.
-		if rCurrentActor.sCTNode ~= rIterationActor.sCTNode then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
+		if rIterationActor and rCurrentActor.sCTNode ~= rIterationActor.sCTNode then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				-- Finish creating the message (with text and secret flag), then post it to chat.
@@ -76,7 +80,8 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
-				local bSecret = (rCurrentActor.sType == 'npc' and CombatManager.isCTHidden(nodeCTSource)) or CombatManager.isCTHidden(nodeCT)
+				local sFaction = ActorManager.getFaction(rCurrentActor)
+				local bSecret = (rCurrentActor.sType == "npc" and sFaction ~= "friend") or CombatManager.isCTHidden(nodeCT)
 				displayChatMessage(sText, bSecret, bLocalChat)
 			end
 		end
@@ -86,15 +91,23 @@ end
 -- Function that walks the CT nodes and deletes the stealth effects from them.
 function clearAllStealthTrackerDataFromCT()
 	-- Walk the CT resetting all names.
+	local ctListChildren = DB.getChildren(CombatManager.CT_LIST)
+	if not ctListChildren then return end
+
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
-	for _,nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
+	for _,nodeCT in pairs(ctListChildren) do
 		deleteAllStealthEffects(nodeCT)
 	end
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
 function deleteAllStealthEffects(nodeCT)
-	for _,nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+	if not nodeCT then return end
+
+	local nodeCTEffects = DB.getChildren(nodeCT, "effects")
+	if not nodeCTEffects then return end
+
+	for _,nodeEffect in pairs(nodeCTEffects) do
 		if getStealthValueFromEffectNode(nodeEffect) then
 			nodeEffect.delete()
 		end
@@ -103,10 +116,9 @@ end
 
 -- Puts a message in chat that is broadcast to everyone attached to the host (including the host).
 function displayChatMessage(sFormattedText, bSecret, bLocal)
-	local msg = {font = "msgfont"}
-	msg.icon = "stealth_icon"
-	msg.secret = bSecret
-	msg.text = sFormattedText
+	if not sFormattedText then return end
+
+	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
 
 	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bLocal then
@@ -123,9 +135,11 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	-- First, let's build a new table that has the strings as they are to be output in chat.
 	local aUnawareActorNamesAndPP = {}
 	for _, rActor in ipairs(aUnawareTargets) do
-		local nPPActor = getPassivePerceptionNumber(rActor)
-		if nPPActor ~= nil then
-			table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", ActorManager.getDisplayName(rActor), getPassivePerceptionNumber(rActor)))
+		if rActor then
+			local nPPActor = getPassivePerceptionNumber(rActor)
+			if nPPActor ~= nil then
+				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", ActorManager.getDisplayName(rActor), getPassivePerceptionNumber(rActor)))
+			end
 		end
 	end
 
@@ -133,7 +147,7 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 	if #aUnawareActorNamesAndPP == 0 then return end
 
 	-- Now, let's display a summary message and append the output strings from above appended to the end.
-	local sChatMessage = string.format("'%s' is attacking from stealth (Stealth: %d) but did not specify a target. The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
+	local sChatMessage = string.format("'%s' is stealthing (Stealth: %d). The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
 										sSourceName,
 										nStealthSource,
 										table.concat(aUnawareActorNamesAndPP, "\r"))
@@ -149,16 +163,20 @@ function displayUnawareTargetsForCurrentCTActor()
 	end
 
 	local rSource = ActorManager.resolveActor(nodeActiveCT)
+	if not rSource then return end
+
 	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
-	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
 	if not nStealthSource then
-		local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
-													ActorManager.getDisplayName(rSource))
-		displayChatMessage(sActorNotStealthing, false, true)
+		-- TODO: Experimenting with less chattiness here since more likely than not, the actor won't be stealthing.
+		-- local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
+		-- 											ActorManager.getDisplayName(rSource))
+		-- displayChatMessage(sActorNotStealthing, false, true)
 		return
 	end
+
+	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
 	if #aUnawareTargets == 0 then
-		displayChatMessage("No unaware targets found.", false, true)
+		displayChatMessage("Current CT actor is stealthing but no unaware targets found.", false, true)
 		return
 	end
 
@@ -167,13 +185,18 @@ end
 
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
 function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
+	if not nAttackerStealth or not rTarget then return false end
+
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
-	return nAttackerStealth and rTarget and nPPTarget ~= nil and nPPTarget >= nAttackerStealth
+	return nPPTarget ~= nil and nPPTarget >= nAttackerStealth
 end
 
 -- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 function expireStealthEffectOnCTNode(nodeCT)
+	if not nodeCT then return end
+
 	local aSortedCTNodes = getOrderedEffectsTableFromCTNode(nodeCT)
+	if not aSortedCTNodes then return end
 	local nodeLastEffectWithStealth
 
 	-- Walk the effects in order so that the last one added is taken in case they are stacked.
@@ -266,6 +289,8 @@ end
 
 -- Used to get the string representation of the stealth value from an effect node.
 function getStealthValueFromEffectNode(nodeEffect)
+	if not nodeEffect then return end
+
 	local sEffectLabel = DB.getValue(nodeEffect, "label", ""):lower()
 	local sExtractedStealth
 
@@ -292,9 +317,9 @@ function getUnawareCTTargetsGivenSource(rSource)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
-		local rActor = ActorManager.resolveActor(nodeCT)
-		if not isTargetHiddenFromSource(rSource, rActor) and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rActor) then
-			table.insert(aUnawareTargets, rActor)
+		local rTarget = ActorManager.resolveActor(nodeCT)
+		if not isTargetHiddenFromSource(rSource, rTarget) and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+			table.insert(aUnawareTargets, rTarget)
 		end
 	end
 
@@ -303,42 +328,52 @@ end
 
 -- Handler for the message to do an attack from a position of stealth.
 function handleAttackFromStealth(msgOOB)
-	if not msgOOB then return end
+	if not msgOOB or not msgOOB.type then return end
 
 	if msgOOB.type == OOB_MSGTYPE_ATTACKFROMSTEALTH then
 		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
-		msgOOB.nSourceStealth = tonumber(msgOOB.nSourceStealth)
+		if not msgOOB.sSourceCTNode or not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
+		local nSourceStealth = tonumber(msgOOB.nSourceStealth)
 		local nodeSourceCT = DB.findNode(msgOOB.sSourceCTNode)
+		local nodeTargetCT = DB.findNode(msgOOB.sTargetCTNode)
+		if not nodeSourceCT or not nodeTargetCT then return end
 		local rSource = ActorManager.resolveActor(nodeSourceCT)
-		local rTarget = ActorManager.resolveActor(DB.findNode(msgOOB.sTargetCTNode))
+		local rTarget = ActorManager.resolveActor(nodeTargetCT)
 
-		performAttackFromStealth(rSource, rTarget, msgOOB.nSourceStealth)
+		performAttackFromStealth(rSource, rTarget, nSourceStealth)
 	end
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
 function handleUpdateStealth(msgOOB)
-	if not msgOOB then return end
+	if not msgOOB or not msgOOB.type then return end
 
 	if msgOOB.type == OOB_MSGTYPE_UPDATESTEALTH then
+		if not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
 		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
-		msgOOB.nStealthTotal = tonumber(msgOOB.nStealthTotal)
-		setNodeWithStealthValue(msgOOB.sCTNodeId, msgOOB.nStealthTotal, msgOOB.user)
+		local nStealthTotal = tonumber(msgOOB.nStealthTotal)
+		if not nStealthTotal then return end
+		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal, msgOOB.user)
 	end
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
 function isTargetHiddenFromSource(rSource, rTarget)
+	if not rSource or not rTarget then return end
+
 	-- If the target has a stealth value, compare the source's PP to it to see if the attacker perceives the hiding target.
-	local nStealthTarget = getStealthNumberFromEffects(DB.findNode(rTarget.sCTNode))
-	if nStealthTarget then
+	local rTargetCTNode = DB.findNode(rTarget.sCTNode)
+	if not rTargetCTNode then return end
+	local nStealthTarget = getStealthNumberFromEffects(rTargetCTNode)
+	if nStealthTarget ~= nil then
 		local nPPSource = getPassivePerceptionNumber(rSource)
 		if nPPSource ~= nil and nPPSource < nStealthTarget then
 			local rHiddenActor = {
 				source = rSource,
 				target = rTarget,
 				stealth = nStealthTarget,
-				sourcePP = nPPSource }
+				sourcePP = nPPSource
+			}
 
 			return rHiddenActor
 		end
@@ -362,7 +397,6 @@ function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode, nSourceStealth)
 	msgOOB.nSourceStealth = nSourceStealth
 
 	Comm.deliverOOBMessage(msgOOB, "")
-
 end
 
 -- Function to notify the host of a stealth update request.  The arguments are the CT node identifier and the stealth total number.
@@ -389,12 +423,19 @@ function onCombatResetEvent()
 end
 
 -- Fires with something is dropped on the CT
--- luacheck: ignore rSource
-function onDropEvent(rSource, rTarget, draginfo)
+-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the rSource argument).
+function onDropEvent(_, rTarget, draginfo)
+	if not rTarget or not rTarget.sCreatureNode or not rTarget.sCTNode or not draginfo then return true end
+
+	local sDragInfoData = draginfo.getStringData()
+	if not sDragInfoData then return end
 	-- If the dropped item was a stealth roll, update the target creature node with the stealth value.
-	if string.find(draginfo.getStringData(), "[SKILL] Stealth", 1, true) or string.find(draginfo.getStringData(), "[CHECK] Dexterity", 1, true) then
+	if string.find(sDragInfoData, "[SKILL] Stealth", 1, true) or string.find(sDragInfoData, "[CHECK] Dexterity", 1, true) then
 		-- Use the creature node, that way if it's a PC, we get its owner.
-		local sTargetOwner = DB.getOwner(DB.findNode(rTarget.sCreatureNode))
+		local rTargetCreatureNode = DB.findNode(rTarget.sCreatureNode)
+		if not rTargetCreatureNode then return end
+		local sTargetOwner = DB.getOwner(rTargetCreatureNode)
+		if not sTargetOwner then return true end
 		setNodeWithStealthValue(rTarget.sCTNode, draginfo.getNumberData(), sTargetOwner)
 		-- If it's desired to report the change in chat, be sure to make it secret for hidden actors.
 	end
@@ -411,9 +452,8 @@ function onRollAttack(rSource, rTarget, rRoll)
 	-- If the source is nil but rTarget and rRoll are present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
 	if not rSource then
 		local nodeActiveCT = CombatManager.getActiveCT()
-		if nodeActiveCT then
-			rSource = ActorManager.resolveActor(nodeActiveCT)
-		end
+		if not nodeActiveCT then return end
+		rSource = ActorManager.resolveActor(nodeActiveCT)
 	end
 
 	-- if no source or no roll then exit, skipping StealthTracker processing.
@@ -426,10 +466,11 @@ function onRollAttack(rSource, rTarget, rRoll)
 		-- For each actor in the combat tracker, check to see if it is a viable target.
 		-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
 		local lCombatTrackerActors = CombatManager.getSortedCombatantList()
+		if not lCombatTrackerActors then return end
 		-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 		for _,nodeCT in ipairs(lCombatTrackerActors) do
 			local rActor = ActorManager.resolveActor(nodeCT)
-			if not CombatManager.isCTHidden(nodeCT) and rSource.sCTNode ~= rActor.sCTNode then
+			if rActor and not CombatManager.isCTHidden(nodeCT) and rSource.sCTNode ~= rActor.sCTNode then
 				local rHiddenTarget = isTargetHiddenFromSource(rSource, rActor)
 				if rHiddenTarget then
 					-- table.insert() will insert rActor into the table using the default integer 1's based key.
@@ -445,7 +486,7 @@ function onRollAttack(rSource, rTarget, rRoll)
 			local nSourcePP
 			for _,rHiddenTarget in ipairs(aHiddenTargets) do
 				table.insert(aHiddenActorNamesAndStealth, string.format("'%s' - Stealth: %d", ActorManager.getDisplayName(rHiddenTarget.target), rHiddenTarget.stealth))
-				-- Only populate the nSourcePP once for use in the format msg.
+				-- Only populate the nSourcePP once for use in the format msg (not is true only for nil & false... zero doesn't apply).
 				if not nSourcePP then
 					nSourcePP = rHiddenTarget.sourcePP
 				end
@@ -459,7 +500,9 @@ function onRollAttack(rSource, rTarget, rRoll)
 		end
 
 		-- Expire their stealth attack
-		expireStealthEffectOnCTNode(DB.findNode(rSource.sCTNode))
+		local nodeSourceCT = DB.findNode(rSource.sCTNode)
+		if not nodeSourceCT then return end
+		expireStealthEffectOnCTNode(nodeSourceCT)
 
 		-- Discontinue StealthTracker attack processing (instead of putting the rTarget ~= nil logic in an else branch.)
 		return
@@ -510,7 +553,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 		-- Capture the creature node of the actor that made the die roll
 		nodeCreature = DB.findNode(rSource.sCTNode)
 		-- Check to see if the current actor is a npc and not visible.  If so, make the roll as secret/tower.
-		if nodeCreature and rSource.sType == 'npc' and CombatManager.isCTHidden(nodeCreature) then
+		if nodeCreature and rSource.sType == "npc" and CombatManager.isCTHidden(nodeCreature) then
 			rRoll.bSecret = true
 			rRoll.bTower = true
 		end
@@ -533,7 +576,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
 
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= '' and nodeActiveCT and rRoll.aDice[1] and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
+	if rSource.sCTNode ~= "" and nodeActiveCT and rRoll.aDice[1] and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRoll() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
 		local nStealthTotal = rRoll.aDice[1].result + rRoll.nMod
 
@@ -591,7 +634,7 @@ end
 -- Chat commands that are for host only
 function processHostOnlySubcommands(sSubcommand)
 	-- Default/empty subcommand - What does the current CT actor not perceive?
-	if sSubcommand == '' then
+	if sSubcommand == "" then
 		-- This is the default subcommand for the host (/st with no subcommand). It will give a local only display of the actors hidden from the active CT actor.
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
@@ -616,7 +659,7 @@ end
 -- Chat commands that are for clients only
 function processUserOnlySubcommands(sSubcommand)
 	-- Default/empty subcommand - What does the character(s) asking not perceive?  Might be multiple.
-	if sSubcommand == '' then
+	if sSubcommand == "" then
 		-- If combat is going (there's an active actor in CT)
 		if CombatManager.getActiveCT() then
 			--This is the default subcommand for the client (/st with no subcommand).
