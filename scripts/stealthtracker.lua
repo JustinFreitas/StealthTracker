@@ -157,22 +157,13 @@ end
 function displayUnawareTargetsForCurrentCTActor()
 	-- Get the stealth for the current actor.
 	local nodeActiveCT = CombatManager.getActiveCT()
-	if not nodeActiveCT then
-		displayChatMessage("No active CT actor.", false, true)
-		return
-	end
+	if not nodeActiveCT then return end
 
 	local rSource = ActorManager.resolveActor(nodeActiveCT)
 	if not rSource then return end
 
 	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
-	if not nStealthSource then
-		-- TODO: Experimenting with less chattiness here since more likely than not, the actor won't be stealthing.
-		-- local sActorNotStealthing = string.format("Current CT actor '%s' is not stealthing.",
-		-- 											ActorManager.getDisplayName(rSource))
-		-- displayChatMessage(sActorNotStealthing, false, true)
-		return
-	end
+	if not nStealthSource then return end
 
 	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
 	if #aUnawareTargets == 0 then
