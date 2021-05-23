@@ -448,7 +448,7 @@ function onRollAttack(rSource, rTarget, rRoll)
 	end
 
 	-- if no source or no roll then exit, skipping StealthTracker processing.
-	if not rSource or not rRoll then return end
+	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" or not rRoll then return end
 
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	-- When there is no target, report the CT actors that are hidden from the source.
