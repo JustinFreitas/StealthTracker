@@ -350,7 +350,7 @@ end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
 function isTargetHiddenFromSource(rSource, rTarget)
-	if not rSource or not rTarget then return end
+	if not rSource or not rTarget or not rTarget.sCTNode then return end
 
 	-- If the target has a stealth value, compare the source's PP to it to see if the attacker perceives the hiding target.
 	local rTargetCTNode = DB.findNode(rTarget.sCTNode)
