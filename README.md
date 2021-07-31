@@ -1,10 +1,10 @@
 # StealthTracker
 
-StealthTracker v2.2 by Justin Freitas
+StealthTracker v2.3 by Justin Freitas
 
 ReadMe and Usage Notes
 
-StealthTracker is a simple FG v3.X, 5e ruleset based extension that notifies the chat of the Combat Tracker actors that are not perceptible by the current CT actor due to being hidden.  This works by comparing the Passive Perception of the current actor (character sheet for PC, CT sheet for NPC) against any tracked stealth roll value for the other CT actors.  The stealth roll value for the various CT actors is tracked as an effect on the CT actor with the syntax "Stealth: XX".  If a NPC sheet doesn't have the "senses" sheet entry with an embedded "passive Perception ##" value (case sensitive), then the value will be computed as 10 + wisdom bonus.  For a PC sheet, the PP is taken from the field, which always has a value.  I chose to use the name field to track the stealth because it had the least impact on the ruleset and also because the PC can very easily update their character sheet.  I noticed that modifying only the CT record for PCs didn't save its state from host session to session, whereas, that data is persisted in the character sheet record.
+StealthTracker is a Fantasy Grounds (Classic or Unity) v3.3.15+, 5e ruleset based extension that notifies the chat of the Combat Tracker actors that are not perceptible by the current CT actor due to being hidden.  This works by comparing the Passive Perception of the current actor (character sheet for PC, CT sheet for NPC) against any tracked stealth roll value for the other CT actors.  The stealth roll value for the various CT actors is tracked as an effect on the CT actor with the syntax "Stealth: XX".  If a NPC sheet doesn't have the "senses" sheet entry with an embedded "passive Perception ##" value (case sensitive), then the value will be computed as 10 + wisdom bonus.  For a PC sheet, the PP is taken from the field, which always has a value.  I chose to use the name field to track the stealth because it had the least impact on the ruleset and also because the PC can very easily update their character sheet.  I noticed that modifying only the CT record for PCs didn't save its state from host session to session, whereas, that data is persisted in the character sheet record.
 
 With version 1.2+ of the extension, the stealth roll will automatically be added to the name field of the character sheet (for PC) or the name field of the CT sheet (for NPC).  This only happens when combat is active (there is an active actor in the CT).  Also, players are restricted from the automatic name update when it's not their turn in combat.  When an actor's turn is reached, any existing stealth tracking will be removed, as they will need to stealth again to continue hiding.  When the initiative is cleared (via the CT menu), all stealth data will be removed from the CT actor names automatically (same functionality as '/st clear' chat command). At any time, the manual approach of editing character or PC names will still work for updates.
 
@@ -27,5 +27,6 @@ Changelist:
 - v2.0 - This was a major change to move from tracking stealth in the actor's name to tracking stealth in the actor's effects list.  This helped to eliminate several limitations that were a side effect of overloading the actor name field.
 - v2.1 - Update to account for 3.3.13.
 - v2.2 - Deprecation updates.  Addition of current CT actor name to the 'not stealthing' message for clarity. Update to account for 3.3.14.
+- v2.3 - Bug fixes and protection from null pointer exceptions.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
