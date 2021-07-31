@@ -535,7 +535,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRoll(rSource, rTarget, rRoll))
 	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll.  Allow this for NPC's without a Stealth skill only.
 	-- local bProcessStealth = rSource and rRoll and (string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true) or string.find(rRoll.sDesc, "[CHECK] Dexterity", 1, true))
-	local bProcessStealth = rSource and rRoll and string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true)
+	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true)
 	local nodeCreature
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
