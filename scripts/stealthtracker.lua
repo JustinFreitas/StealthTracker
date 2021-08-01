@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.3 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (4/24/21)"
+	msg.text = "StealthTracker v2.3 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/1/21)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
