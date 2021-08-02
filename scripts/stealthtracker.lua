@@ -251,6 +251,7 @@ function getPassivePerceptionNumber(rActor)
 		end
 	end
 
+	-- TODO: Include the Stealth proficiency for PCs (if available) for this calculation.
 	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort (for PCs/charsheet, it should use Perception Prof/Expertise if it's there).
 	if not nPP then
 		-- If senses/passive Perception isn't available, calculate from 10 + wis.  This code assumes the 5E ruleset items utilized will be there.
