@@ -230,7 +230,7 @@ function getPassivePerceptionNumber(rActor)
 	end
 
 	-- The perception is calculated from different shees for pc vs npc.
-	if rActor.sType == "pc" then
+	if rActor.sType == "charsheet" then
 		-- For a PC it's the "perception" child node.
 		-- The perception value is always populated and always a number type.
 		local nodePerception = rCreatureNode.getChild("perception")
@@ -251,7 +251,7 @@ function getPassivePerceptionNumber(rActor)
 		end
 	end
 
-	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort.
+	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort (for PCs/charsheet, it should use Perception Prof/Expertise if it's there).
 	if not nPP then
 		-- If senses/passive Perception isn't available, calculate from 10 + wis.  This code assumes the 5E ruleset items utilized will be there.
 		nPP = 10 + ActorManager5E.getAbilityBonus(rCreatureNode, "wisdom")
