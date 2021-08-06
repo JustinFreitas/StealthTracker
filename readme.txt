@@ -1,3 +1,14 @@
+https://github.com/JustinFreitas/StealthTracker
+
+WARNING:
+
+This extension is incompatible with any other extension that overrides the skill or attack handlers.  There are probably many out there, so as I hear about them, I'll add them to the list.  I 
+recommend you uninstall StealthTracker and use the other extension instead, in most cases.  Here are the extensions that StealthTracker is confirmed to not work with:
+
+5e - Automatic Halfling Luck
+
+
+
 StealthTracker v2.3 by Justin Freitas
 
 ReadMe and Usage Notes
