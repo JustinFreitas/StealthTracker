@@ -230,7 +230,7 @@ function getPassivePerceptionNumber(rActor)
 	end
 
 	-- The perception is calculated from different shees for pc vs npc.
-	if rActor.sType == "charsheet" then
+	if rActor.sType == "charsheet" or rActor.sType == "pc" then
 		-- For a PC it's the "perception" child node.
 		-- The perception value is always populated and always a number type.
 		local nodePerception = rCreatureNode.getChild("perception")
