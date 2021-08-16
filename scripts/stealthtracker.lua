@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.3 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/1/21)"
+	msg.text = "StealthTracker v2.4 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/15/21)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
@@ -39,8 +39,12 @@ function onInit()
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
 	-- On extension init, override the skill result handler with ours and call the default when we are done with our work.
-	-- This would mean that there could be compatibility issues with other extensions that use the same technique.
+	-- The potential conflict has been mitigated by a chaining technique where we store the current action handler for use in our overridden handler.
+	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
+	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
+	ActionAttack.onAttackStealthTracker = ActionAttack.onAttack
+	ActionAttack.onAttack = onRollAttack
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Set up the chat command for everyone, clients and host.
@@ -438,8 +442,8 @@ end
 
 -- Attack roll handler
 function onRollAttack(rSource, rTarget, rRoll)
-	-- Call the default attack roll handler.
-	ActionAttack.onAttack(rSource, rTarget, rRoll)
+	-- Call the stored (during initialization in onInit()) attack roll handler.
+	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
 
 	-- If the source is nil but rTarget and rRoll are present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
 	if not rSource then
@@ -531,9 +535,9 @@ function onRollAttack(rSource, rTarget, rRoll)
 end
 
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
--- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the default handler, and finally finish up with more logic.
+-- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
-	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRoll(rSource, rTarget, rRoll))
+	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
 	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll.  Allow this for NPC's without a Stealth skill only.
 	-- local bProcessStealth = rSource and rRoll and (string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true) or string.find(rRoll.sDesc, "[CHECK] Dexterity", 1, true))
 	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true)
@@ -552,7 +556,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 	end
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
-	ActionSkill.onRoll(rSource, rTarget, rRoll)
+	ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll)
 
 	-- If this isn't a Stealth roll, forgo StealthTracker processing.
 	if not bProcessStealth then return end
@@ -569,7 +573,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
 	if rSource.sCTNode ~= "" and nodeActiveCT and rRoll.aDice[1] and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
-		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRoll() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
+		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRollStealthTracker() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
 		local nStealthTotal = rRoll.aDice[1].result + rRoll.nMod
 
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.

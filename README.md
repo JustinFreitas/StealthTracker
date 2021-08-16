@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v2.3 by Justin Freitas
+StealthTracker v2.4 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -28,5 +28,6 @@ Changelist:
 - v2.1 - Update to account for 3.3.13.
 - v2.2 - Deprecation updates.  Addition of current CT actor name to the 'not stealthing' message for clarity. Update to account for 3.3.14.
 - v2.3 - Bug fixes and protection from null pointer exceptions.
+- v2.4 - Change to the action handler override mechanism to chain in the override instead of always calling the base.  This should work around the compatibility issues with other extensions.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
