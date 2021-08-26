@@ -19,7 +19,7 @@ function onInit()
 	-- Prepare the launch message object
 	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
 	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.4 for Fantasy Grounds v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/15/21)"
+	msg.text = "StealthTracker v2.5 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/25/21)"
 	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
 	ChatManager.registerLaunchMessage(msg)
 
@@ -77,7 +77,7 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				-- Finish creating the message (with text and secret flag), then post it to chat.
-				local sText = string.format("'%s' DOES NOT PERCEIVE '%s' due to being hidden (pp=%d vs. stealth=%d).",
+				local sText = string.format("'%s' DOES NOT PERCEIVE '%s' due to being hidden (pp=%d vs stealth=%d).",
 											ActorManager.getDisplayName(rHiddenTarget.source),
 											ActorManager.getDisplayName(rIterationActor),
 											rHiddenTarget.sourcePP,
@@ -511,7 +511,7 @@ function onRollAttack(rSource, rTarget, rRoll)
 	local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 	if rHiddenTarget then
 		-- Warn the chat that the target might be hidden
-		local sMsgText = string.format("Target hidden from attacker. Attack possible? ('%s' Stealth: %d, '%s' Passive Perception: %d).",
+		local sMsgText = string.format("Target hidden from attacker. Should attack be possible? ('%s' Stealth: %d, '%s' Passive Perception: %d).",
 										ActorManager.getDisplayName(rTarget),
 										rHiddenTarget.stealth,
 										ActorManager.getDisplayName(rSource),
@@ -597,9 +597,9 @@ end
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
-	if nPPTarget ~= nil and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+	if nPPTarget ~= nil and not isTargetHiddenFromSource(rSource, rTarget) and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 		-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-		local sMsgText = string.format("Attacker is hidden from target. Advantage? ('%s' Passive Perception: %d, '%s' Stealth: %d).",
+		local sMsgText = string.format("Attacker is hidden from target. Should attack be at advantage? ('%s' Passive Perception: %d, '%s' Stealth: %d).",
 									   ActorManager.getDisplayName(rTarget),
 									   nPPTarget,
 									   ActorManager.getDisplayName(rSource),
