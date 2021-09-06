@@ -11,19 +11,18 @@
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 -- Global message type to allow the client to attack from stealth on the host.
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
+-- StealthTracker icon identifier
+STEALTH_TRACKER_ICON = "stealth_icon"
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 -- luacheck: ignore onInit
 function onInit()
-
-	-- Prepare the launch message object
-	local msg = { sender = "", font = "emotefont", icon = "stealth_icon" }
-	-- Here we name our extension, copyright, and author (Lua handles most \ commands as per other string languages where \r is a carriage return.
-	msg.text = "StealthTracker v2.5 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (8/25/21)"
-	-- Register Extension Launch Message (This registers the launch message with the ChatManager.)
+	-- Here we name our extension, copyright, and author (Lua handles most special characters as per other languages, where \r is a carriage return).
+	local msg = { sender = "", font = "emotefont", icon = STEALTH_TRACKER_ICON }
+	msg.text = "StealthTracker v2.6 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (9/6/21)"
 	ChatManager.registerLaunchMessage(msg)
 
-	-- Only set up the extension functionality on the host machine because it has access/permission to all of the necessary data.
+	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if User.isHost() then
 		-- Here is where we register the onTurnStartEvent. We can register many of these which is useful. It adds them to a list and iterates through them in the order they were added.
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
@@ -38,7 +37,7 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	-- On extension init, override the skill result handler with ours and call the default when we are done with our work.
+	-- On extension init, override the skill and attack result handlers with ours and call the default when we are done with our work (in the override).
 	-- The potential conflict has been mitigated by a chaining technique where we store the current action handler for use in our overridden handler.
 	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
 	ActionSkill.onRoll = onRollSkill
@@ -54,12 +53,17 @@ end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
 
+-- Converts a boolean into a number.
+function booleanToNumber(bValue)
+	return bValue == true and 1 or bValue == false and 0
+end
+
 -- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
 function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 	if not nodeCTSource then return end
 
 	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
-	if not rCurrentActor then return end
+	if not rCurrentActor or not rCurrentActor.sCreatureNode then return end
 
 	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
 	local nodeCreature = DB.findNode(rCurrentActor.sCreatureNode)
@@ -84,8 +88,7 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
-				local sFaction = ActorManager.getFaction(rCurrentActor)
-				local bSecret = (rCurrentActor.sType == "npc" and sFaction ~= "friend") or CombatManager.isCTHidden(nodeCT)
+				local bSecret = (isNpc(rCurrentActor) and not isFriend(rCurrentActor)) or CombatManager.isCTHidden(nodeCT)
 				displayChatMessage(sText, bSecret, bLocalChat)
 			end
 		end
@@ -122,7 +125,7 @@ end
 function displayChatMessage(sFormattedText, bSecret, bLocal)
 	if not sFormattedText then return end
 
-	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
+	local msg = {font = "msgfont", icon = STEALTH_TRACKER_ICON, secret = bSecret, text = sFormattedText}
 
 	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bLocal then
@@ -235,13 +238,13 @@ function getPassivePerceptionNumber(rActor)
 
 	-- The perception is calculated from different shees for pc vs npc.
 	if rActor.sType == "charsheet" or rActor.sType == "pc" then
-		-- For a PC it's the "perception" child node.
+		-- For a PC it's the perception child node.
 		-- The perception value is always populated and always a number type.
 		local nodePerception = rCreatureNode.getChild("perception")
 		if nodePerception then
 			nPP = nodePerception.getValue()
 		end
-	elseif rActor.sType == "npc" then
+	elseif isNpc(rActor) then
 		-- Limitation: NPC must have 'passive Perception X' in the 'senses' field, otherwise, 10+wis is used.
 		local rSensesNode = rCreatureNode.getChild("senses")
 		local sSensesValue, sPP
@@ -311,6 +314,8 @@ function getUnawareCTTargetsGivenSource(rSource)
 	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 	local aUnawareTargets = {}
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
+	if not lCombatTrackerActors then return end
+
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
 		local rTarget = ActorManager.resolveActor(nodeCT)
@@ -351,6 +356,30 @@ function handleUpdateStealth(msgOOB)
 		if not nStealthTotal then return end
 		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal, msgOOB.user)
 	end
+end
+
+-- Checks to see if the roll description (or drag info data) is a dexterity check roll.
+function isDexterityCheckRoll(sRollData)
+	if not sRollData then return false end
+	return string.find(sRollData, "[CHECK] Dexterity", 1, true)
+end
+
+-- Function that checks an actor record to see if it's a friend (faction).
+function isFriend(rActor)
+	if not rActor then return false end
+	return ActorManager.getFaction(rActor) == "friend"
+end
+
+-- Function that check an actor record (i.e. from ActorManager.resolveActor(nodeCT)) to see if it's an npc.
+function isNpc(rActor)
+	if not rActor then return false end
+	return rActor.sType == "npc"
+end
+
+-- Checks to see if the roll description (or drag info data) is a stealth skill roll.
+function isStealthSkillRoll(sRollData)
+	if not sRollData then return false end
+	return string.find(sRollData, "[SKILL] Stealth", 1, true)
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
@@ -426,7 +455,7 @@ function onDropEvent(_, rTarget, draginfo)
 	local sDragInfoData = draginfo.getStringData()
 	if not sDragInfoData then return end
 	-- If the dropped item was a stealth roll, update the target creature node with the stealth value.
-	if string.find(sDragInfoData, "[SKILL] Stealth", 1, true) or string.find(sDragInfoData, "[CHECK] Dexterity", 1, true) then
+	if isStealthSkillRoll(sDragInfoData) or isDexterityCheckRoll(sDragInfoData) then
 		-- Use the creature node, that way if it's a PC, we get its owner.
 		local rTargetCreatureNode = DB.findNode(rTarget.sCreatureNode)
 		if not rTargetCreatureNode then return end
@@ -538,9 +567,8 @@ end
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
-	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll.  Allow this for NPC's without a Stealth skill only.
-	-- local bProcessStealth = rSource and rRoll and (string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true) or string.find(rRoll.sDesc, "[CHECK] Dexterity", 1, true))
-	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and string.find(rRoll.sDesc, "[SKILL] Stealth", 1, true)
+	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll (i.e. "[CHECK] Dexterity").  Allow this for NPC's without a Stealth skill only.
+	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and isStealthSkillRoll(rRoll.sDesc)
 	local nodeCreature
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
@@ -549,9 +577,8 @@ function onRollSkill(rSource, rTarget, rRoll)
 		-- Capture the creature node of the actor that made the die roll
 		nodeCreature = DB.findNode(rSource.sCTNode)
 		-- Check to see if the current actor is a npc and not visible.  If so, make the roll as secret/tower.
-		if nodeCreature and rSource.sType == "npc" and CombatManager.isCTHidden(nodeCreature) then
+		if nodeCreature and isNpc(rSource) and CombatManager.isCTHidden(nodeCreature) then
 			rRoll.bSecret = true
-			rRoll.bTower = true
 		end
 	end
 
@@ -661,6 +688,7 @@ function processUserOnlySubcommands(sSubcommand)
 			--This is the default subcommand for the client (/st with no subcommand).
 			-- For each of the user's active identities, get teh CT node for it and then use that node to check for hidden.
 			local aIdentities = User.getActiveIdentities()
+			if not aIdentities then return end
 			for _, sIdentity in ipairs(aIdentities) do
 				local nodeCT = CombatManager.getCTFromNode("charsheet." .. sIdentity)
 				checkCTNodeForHiddenActors(nodeCT, true)
@@ -686,8 +714,10 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal, sUser)
 	local sEffectName = string.format("Stealth: %d", nStealthTotal)
 	local nNextActorInit = DB.getValue(nodeCT, "initresult", 0) - 1
 	local nEffectInit = ternary(nNextActorInit > 0, nNextActorInit, 0)
-	local nEffectDuration = ternary(nEffectInit > 0, 2, 1)
-	EffectManager.addEffect(sUser or "", User.getIdentityLabel(), nodeCT, { sName = sEffectName, nInit = nEffectInit, nDuration = nEffectDuration }, true)
+	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).  Here's the old 1/2 duration ternary:  ternary(nEffectInit > 0, 2, 1)
+	local rActor = ActorManager.resolveActor(nodeCT)
+	local nEffectGMOnly = booleanToNumber(isNpc(rActor) and not isFriend(rActor))
+	EffectManager.addEffect(sUser or "", User.getIdentityLabel(), nodeCT, { sName = sEffectName, nInit = nEffectInit, nDuration = nEffectDuration, nGMOnly = nEffectGMOnly }, true)
 end
 
 -- Function to serve as a ternary operator (i.e. cond ? T : F)
