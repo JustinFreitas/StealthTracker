@@ -19,8 +19,14 @@ STEALTH_TRACKER_ICON = "stealth_icon"
 function onInit()
 	-- Here we name our extension, copyright, and author (Lua handles most special characters as per other languages, where \r is a carriage return).
 	local msg = { sender = "", font = "emotefont", icon = STEALTH_TRACKER_ICON }
-	msg.text = "StealthTracker v2.7 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (9/7/21)"
+	msg.text = "StealthTracker v2.8 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (9/16/21)"
 	ChatManager.registerLaunchMessage(msg)
+
+	-- Register StealthTracker Options
+	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
+		{ baselabel = "option_val_on", baseval = "on", labels = "option_val_off", values = "off", default = "on" })
+	OptionsManager.registerOption2("STEALTHTRACKER_BROADCAST_INFO", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_BROADCAST_INFO", "option_entry_cycler",
+		{ baselabel = "option_val_on", baseval = "on", labels = "option_val_off", values = "off", default = "off" })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if User.isHost() then
@@ -34,6 +40,10 @@ function onInit()
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		-- Register a handler for the attackfromstealth OOB message.
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
+
+		-- Register chat commands for host only.
+		Comm.registerSlashHandler("stealthtracker", processChatCommand)
+		Comm.registerSlashHandler("st", processChatCommand)
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
@@ -48,10 +58,6 @@ function onInit()
 	ActionPower.onCastSaveStealthTracker = ActionPower.onCastSave
 	ActionPower.onCastSave = onRollCastSave
 	ActionsManager.registerResultHandler("castsave", onRollCastSave)
-
-	-- Set up the chat command for everyone, clients and host.
-	Comm.registerSlashHandler("stealthtracker", processChatCommand)
-	Comm.registerSlashHandler("st", processChatCommand)
 end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
@@ -61,8 +67,13 @@ function booleanToNumber(bValue)
 	return bValue == true and 1 or bValue == false and 0
 end
 
+function checkBroadcastChatOption()
+	local option = OptionsManager.getOption("STEALTHTRACKER_BROADCAST_INFO"):lower()
+	return option == "on"
+end
+
 -- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
-function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
+function checkCTNodeForHiddenActors(nodeCTSource)
 	if not nodeCTSource then return end
 
 	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
@@ -92,10 +103,15 @@ function checkCTNodeForHiddenActors(nodeCTSource, bLocalChat)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
 				local bSecret = (isNpc(rCurrentActor) and not isFriend(rCurrentActor)) or CombatManager.isCTHidden(nodeCT)
-				displayChatMessage(sText, bSecret, bLocalChat)
+				displayChatMessage(sText, bSecret, not checkBroadcastChatOption())
 			end
 		end
 	end
+end
+
+function checkExpireEffectOption()
+	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
+	return option == "on"
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
@@ -153,14 +169,19 @@ function displayUnawareCTTargetsWithFormatting(sSourceName, nStealthSource, aUna
 		end
 	end
 
-	-- If the table is empty, just bail.
-	if #aUnawareActorNamesAndPP == 0 then return end
-
-	-- Now, let's display a summary message and append the output strings from above appended to the end.
-	local sChatMessage = string.format("'%s' is stealthing (Stealth: %d). The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
+	local sChatMessage
+	if #aUnawareActorNamesAndPP == 0 then
+		sChatMessage = string.format("'%s' is stealthing (Stealth: %d) but everyone in the Combat Tracker sees them.",
+										sSourceName,
+										nStealthSource)
+	else
+		-- Now, let's display a summary message and append the output strings from above appended to the end.
+		sChatMessage = string.format("'%s' is stealthing (Stealth: %d). The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
 										sSourceName,
 										nStealthSource,
 										table.concat(aUnawareActorNamesAndPP, "\r"))
+	end
+
 	displayChatMessage(sChatMessage, false, true)
 end
 
@@ -234,13 +255,7 @@ function getPassivePerceptionNumber(rActor)
 
 	local nPP
 	local rCreatureNode = DB.findNode(rActor.sCreatureNode)
-
-	-- If creature node wasn't fetched, display local error and return nil.
-	if not rCreatureNode then
-		-- Display a secret, local error message.
-		displayChatMessage("Error getting passive perception for: " .. ActorManager.getDisplayName(rActor), true, true)
-		return nil
-	end
+	if not rCreatureNode then return nil end
 
 	-- The perception is calculated from different shees for pc vs npc.
 	if rActor.sType == "charsheet" or rActor.sType == "pc" then
@@ -266,6 +281,7 @@ function getPassivePerceptionNumber(rActor)
 
 	-- TODO: Include the Stealth proficiency for PCs (if available) for this calculation.
 	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort (for PCs/charsheet, it should use Perception Prof/Expertise if it's there).
+	-- Lua note: When used as control expression, the only false values in Lua are false and nil. Everything else is evaluated as true value.
 	if not nPP then
 		-- If senses/passive Perception isn't available, calculate from 10 + wis.  This code assumes the 5E ruleset items utilized will be there.
 		nPP = 10 + ActorManager5E.getAbilityBonus(rCreatureNode, "wisdom")
@@ -339,15 +355,20 @@ function handleAttackFromStealth(msgOOB)
 
 	if msgOOB.type == OOB_MSGTYPE_ATTACKFROMSTEALTH then
 		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
-		if not msgOOB.sSourceCTNode or not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
-		local nSourceStealth = tonumber(msgOOB.nSourceStealth)
-		local nodeSourceCT = DB.findNode(msgOOB.sSourceCTNode)
-		local nodeTargetCT = DB.findNode(msgOOB.sTargetCTNode)
-		if not nodeSourceCT or not nodeTargetCT then return end
-		local rSource = ActorManager.resolveActor(nodeSourceCT)
-		local rTarget = ActorManager.resolveActor(nodeTargetCT)
+		if not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
 
-		performAttackFromStealth(rSource, rTarget, nSourceStealth)
+		local nodeSourceCT = DB.findNode(msgOOB.sSourceCTNode)
+		if not nodeSourceCT then return end
+
+		local rSource = ActorManager.resolveActor(nodeSourceCT)
+		if not rSource then return end
+
+		local rTarget = nil
+		if msgOOB.sTargetCTNode ~= "" then
+			local nodeTargetCT = DB.findNode(msgOOB.sTargetCTNode)
+			rTarget = ActorManager.resolveActor(nodeTargetCT)
+		end
+		processAttackFromStealth(rSource, rTarget)
 	end
 end
 
@@ -360,7 +381,7 @@ function handleUpdateStealth(msgOOB)
 		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 		local nStealthTotal = tonumber(msgOOB.nStealthTotal)
 		if not nStealthTotal then return end
-		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
+		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal, msgOOB.user)
 	end
 end
 
@@ -414,8 +435,8 @@ function isTargetHiddenFromSource(rSource, rTarget)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
-function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode, nSourceStealth)
-	if not sSourceCTNode or not sTargetCTNode or not nSourceStealth then return end
+function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
+	if not sSourceCTNode or not sTargetCTNode then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
@@ -424,9 +445,6 @@ function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode, nSourceStealth)
 	-- Capturing the username allows for the effect to be built so that it can be deleted by the client.
 	msgOOB.sSourceCTNode = sSourceCTNode
 	msgOOB.sTargetCTNode = sTargetCTNode
-	-- Note: numbers will be serialized as strings in the OOB msg.
-	msgOOB.nSourceStealth = nSourceStealth
-
 	Comm.deliverOOBMessage(msgOOB, "")
 end
 
@@ -462,7 +480,12 @@ function onDropEvent(_, rTarget, draginfo)
 	if not sDragInfoData then return end
 	-- If the dropped item was a stealth roll, update the target creature node with the stealth value.
 	if isStealthSkillRoll(sDragInfoData) or isDexterityCheckRoll(sDragInfoData) then
-		setNodeWithStealthValue(rTarget.sCTNode, draginfo.getNumberData())
+		-- Use the creature node, that way if it's a PC, we get its owner.
+		local rTargetCreatureNode = DB.findNode(rTarget.sCreatureNode)
+		if not rTargetCreatureNode then return end
+		local sTargetOwner = DB.getOwner(rTargetCreatureNode)
+		if not sTargetOwner then return true end
+		setNodeWithStealthValue(rTarget.sCTNode, draginfo.getNumberData(), sTargetOwner)
 	end
 
 	-- This is required, otherwise, the wired drop handler fires twice.  It terminates the default drop processing.
@@ -473,11 +496,12 @@ end
 function onRollAttack(rSource, rTarget, rRoll)
 	-- Call the stored (during initialization in onInit()) attack roll handler.
 	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
-	processAttackFromStealth(rSource, rTarget, rRoll)
+	processAttackFromStealth(rSource, rTarget)
 end
 
 function onRollCastSave(rSource, rTarget, rRoll)
 	ActionPower.onCastSaveStealthTracker(rSource, rTarget, rRoll)
+	-- TODO: Check attack possible due to sight?  Will require a processCastSaveFromStealth(), notifyCastSaveFromStealth(), and handleCastSaveFromStealth().
 	expireStealthEffectOnCTNode(rSource)
 end
 
@@ -533,13 +557,14 @@ end
 
 -- This function is one that the Combat Tracker calls if present at the start of a creatures turn.  Wired up in onInit() for the host only.
 function onTurnStartEvent(nodeEntry)
-	-- Do the broadcast of the actors that are hidden to the current actor.
-	checkCTNodeForHiddenActors(nodeEntry, false)
+	-- Do the GM only display of the actors that are hidden to the current actor.
+	checkCTNodeForHiddenActors(nodeEntry)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
 	displayUnawareTargetsForCurrentCTActor()
 end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
+-- This is called from the host only.
 function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	local sMsgText
 	if not isTargetHiddenFromSource(rSource, rTarget) then
@@ -562,29 +587,19 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 				nStealthSource
 			)
 		end
-	else
-		-- Extract the stealth number from the target.
-		local nodeTargetCT = DB.findNode(rTarget.sCTNode)
-		local nStealthTarget = getStealthNumberFromEffects(nodeTargetCT)
-
-		-- Target of attack is hidden from source.  Should attack be possible?  Send msg to GM only.
-		sMsgText = string.format(
-									"Target is hidden from attacker.  Double check that attack should be possible. (Target '%s' Stealth: %d, Attacker '%s' Passive Perception: %d).",
-									ActorManager.getDisplayName(rTarget),
-									nStealthTarget,
-									ActorManager.getDisplayName(rSource),
-									getPassivePerceptionNumber(rSource)
-								)
 	end
 
 	if sMsgText then
-		displayChatMessage(sMsgText, false, true)
+		local bLocal = not checkBroadcastChatOption()
+		displayChatMessage(sMsgText, false, bLocal)
 	end
+
+	expireStealthEffectOnCTNode(rSource)
 end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
-function processAttackFromStealth(rSource, rTarget, rRoll)
-	-- If the source is nil but rTarget and rRoll are present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
+function processAttackFromStealth(rSource, rTarget)
+	-- If the source is nil but rTarget is present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
 	if not rSource then
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then return end
@@ -592,8 +607,19 @@ function processAttackFromStealth(rSource, rTarget, rRoll)
 	end
 
 	-- if no source or no roll then exit, skipping StealthTracker processing.
-	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" or not rRoll then return end
+	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
 
+	-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
+	local nodeSourceCT = DB.findNode(rSource.sCTNode)
+	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
+
+	if not User.isHost() then
+		-- We'll have to marshal the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
+		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "", nStealthSource)
+		return
+	end
+
+	-- HOST ONLY PROCESSING STARTS HERE ----------------------------------------------------------------------------------------------------------
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	-- When there is no target, report the CT actors that are hidden from the source.
 	if not rTarget then
@@ -631,7 +657,7 @@ function processAttackFromStealth(rSource, rTarget, rRoll)
 											   ActorManager.getDisplayName(rSource),
 											   nSourcePP,
 											   table.concat(aHiddenActorNamesAndStealth, "\r"))
-			displayChatMessage(sChatMessage)
+			displayChatMessage(sChatMessage, false, not checkBroadcastChatOption())
 		end
 	else -- if (not rTarget)
 		-- If the target is hidden in the CT, do not perform stealth processing (doesn't make much sense processing the stealth for an attack on a hidden actor).
@@ -646,21 +672,12 @@ function processAttackFromStealth(rSource, rTarget, rRoll)
 											rHiddenTarget.stealth,
 											ActorManager.getDisplayName(rSource),
 											rHiddenTarget.sourcePP)
-			displayChatMessage(sMsgText)
+			displayChatMessage(sMsgText, false, not checkBroadcastChatOption())
 		end
-
-		-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
-		local nodeSourceCT = DB.findNode(rSource.sCTNode)
-		local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
 		if nStealthSource then
-			if User.isHost() then
-				performAttackFromStealth(rSource, rTarget, nStealthSource)
-			else
-				-- We'll have to marshal the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
-				notifyAttackFromStealth(rSource.sCTNode, rTarget.sCTNode, nStealthSource)
-			end
+			performAttackFromStealth(rSource, rTarget, nStealthSource)
 		end
 	end -- else
 
@@ -671,15 +688,10 @@ end
 -- Handler for the 'st' and 'stealthtracker' slash commands in chat.
 -- luacheck: ignore sCommand
 function processChatCommand(sCommand, sParams)
+	if not sParams then return end
 	local sFailedSubcommand
-
 	-- Only allow administrative subcommands when run on the host/DM system.
-	if User.isHost() then
-		sFailedSubcommand = processHostOnlySubcommands(sParams)
-	else
-		sFailedSubcommand = processUserOnlySubcommands(sParams)
-	end
-
+	sFailedSubcommand = processHostOnlySubcommands(sParams)
 	if sFailedSubcommand then
 		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, false, true)
 	end
@@ -692,7 +704,7 @@ function processHostOnlySubcommands(sSubcommand)
 		-- This is the default subcommand for the host (/st with no subcommand). It will give a local only display of the actors hidden from the active CT actor.
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
-		checkCTNodeForHiddenActors(nodeActiveCT, true)
+		checkCTNodeForHiddenActors(nodeActiveCT)
 		displayUnawareTargetsForCurrentCTActor()
 		return
 	end
@@ -703,28 +715,6 @@ function processHostOnlySubcommands(sSubcommand)
 
 		-- Display host command messages as a secret.  Since it's a local msg, it's always local to the issuer.
 		displayChatMessage("clear command complete", false, true)
-		return
-	end
-
-	-- Fallthrough/unrecognized subcommand
-	return sSubcommand
-end
-
--- Chat commands that are for clients only
-function processUserOnlySubcommands(sSubcommand)
-	-- Default/empty subcommand - What does the character(s) asking not perceive?  Might be multiple.
-	if sSubcommand == "" then
-		-- If combat is going (there's an active actor in CT)
-		if CombatManager.getActiveCT() then
-			--This is the default subcommand for the client (/st with no subcommand).
-			-- For each of the user's active identities, get teh CT node for it and then use that node to check for hidden.
-			local aIdentities = User.getActiveIdentities()
-			if not aIdentities then return end
-			for _, sIdentity in ipairs(aIdentities) do
-				local nodeCT = CombatManager.getCTFromNode("charsheet." .. sIdentity)
-				checkCTNodeForHiddenActors(nodeCT, true)
-			end
-		end
 		return
 	end
 
@@ -743,15 +733,16 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	-- Then, add a new effect with the provided stealth value and make it be by user so that he/she can delete it from the CT on their own, if necessary.
 	-- NOTE: When using addEffect to set effects, you must use the sCTNode and NOT the sCreatureNode (no effects on PC character sheet like in CT).
 	local sEffectName = string.format("Stealth: %d", nStealthTotal)
-	local nNextActorInit = DB.getValue(nodeCT, "initresult", 0) - 1
-	local nEffectInit = ternary(nNextActorInit > 0, nNextActorInit, 0)
-	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).  Here's the old 1/2 duration ternary:  ternary(nEffectInit > 0, 2, 1)
-	local rActor = ActorManager.resolveActor(nodeCT)
-	local nEffectGMOnly = booleanToNumber(isNpc(rActor) and not isFriend(rActor))
-	EffectManager.addEffect("", "", nodeCT, { sName = sEffectName, nInit = nEffectInit, nDuration = nEffectDuration, nGMOnly = nEffectGMOnly }, true)
-end
+	local nCurrentActorInit = DB.getValue(nodeCT, "initresult", 0)
+	local nEffectExpirationInit = nCurrentActorInit - .1 -- .1 because we want it to tick right after their turn.
+	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).
+	if checkExpireEffectOption() then -- but let the user override that via an option setting.
+		nEffectDuration = 2  -- because the effect init we used is after the user's turn.
+	end
 
--- Function to serve as a ternary operator (i.e. cond ? T : F)
-function ternary(cond, T, F)
-	if cond then return T else return F end
+	local rActor = ActorManager.resolveActor(nodeCT)
+	if not rActor then return end
+
+	local nEffectGMOnly = booleanToNumber(isNpc(rActor) and not isFriend(rActor))
+	EffectManager.addEffect("", "", nodeCT, { sName = sEffectName, nInit = nEffectExpirationInit, nDuration = nEffectDuration, nGMOnly = nEffectGMOnly }, true)
 end
