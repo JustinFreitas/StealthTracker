@@ -580,18 +580,17 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 		else
 			-- Target sees the attack coming.  Build appropriate message.
 			sMsgText = string.format(
-				"Target sees the attack coming, no advantage from stealth for attacker. (Target '%s' Passive Perception: %d, Attacker '%s' Stealth: %d)",
-				ActorManager.getDisplayName(rTarget),
-				getPassivePerceptionNumber(rTarget),
-				ActorManager.getDisplayName(rSource),
-				nStealthSource
-			)
+										"Target sees the attack coming, no advantage from stealth for attacker. (Target '%s' Passive Perception: %d, Attacker '%s' Stealth: %d)",
+										ActorManager.getDisplayName(rTarget),
+										getPassivePerceptionNumber(rTarget),
+										ActorManager.getDisplayName(rSource),
+										nStealthSource
+									)
 		end
 	end
 
 	if sMsgText then
-		local bLocal = not checkBroadcastChatOption()
-		displayChatMessage(sMsgText, false, bLocal)
+		displayChatMessage(sMsgText, false, not checkBroadcastChatOption())
 	end
 
 	expireStealthEffectOnCTNode(rSource)
