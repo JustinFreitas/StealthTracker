@@ -19,7 +19,7 @@ STEALTH_TRACKER_ICON = "stealth_icon"
 function onInit()
 	-- Here we name our extension, copyright, and author (Lua handles most special characters as per other languages, where \r is a carriage return).
 	local msg = { sender = "", font = "emotefont", icon = STEALTH_TRACKER_ICON }
-	msg.text = "StealthTracker v2.8 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (9/16/21)"
+	msg.text = "StealthTracker v2.9 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (10/9/21)"
 	ChatManager.registerLaunchMessage(msg)
 
 	-- Register StealthTracker Options
@@ -72,7 +72,7 @@ function checkBroadcastChatOption()
 	return option == "on"
 end
 
--- Function to check, for a given CT node, which CT actors are hidden from it.  The local boolean allows for the chat output to be local only (not broadcast).
+-- Function to check, for a given CT node, which CT actors are hidden from it.
 function checkCTNodeForHiddenActors(nodeCTSource)
 	if not nodeCTSource then return end
 
@@ -87,6 +87,7 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	if not lCombatTrackerActors then return end
 
+	-- TODO: Instead of repeating the chat message every iteration can we instead collect the data and issue the chat message once?
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _,nodeCT in ipairs(lCombatTrackerActors) do
 		local rIterationActor = ActorManager.resolveActor(nodeCT)
@@ -211,6 +212,23 @@ function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
 
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
 	return nPPTarget ~= nil and nPPTarget >= nAttackerStealth
+end
+
+function ensureStealthSkillExistsOnNpc(nodeCT)
+	if not nodeCT then return end
+	local rCurrentActor = ActorManager.resolveActor(nodeCT)
+	if rCurrentActor and isNpc(rCurrentActor) then
+		-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
+		local nodeCreature = DB.findNode(rCurrentActor.sCreatureNode)
+		local rSkillsNode = nodeCreature.getChild("skills")
+		sSkillsValue = rSkillsNode.getText()
+		if not sSkillsValue:find("Stealth [+-]%d") then
+			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
+			local sNewSkillsValue = "Stealth +0, " .. rSkillsNode.getText();
+			-- Trim off any trailing comma followed by zero or more whitespace.
+			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
+		end
+	end
 end
 
 -- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
@@ -561,6 +579,8 @@ function onTurnStartEvent(nodeEntry)
 	checkCTNodeForHiddenActors(nodeEntry)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
 	displayUnawareTargetsForCurrentCTActor()
+	-- If the current actor is NPC, add Stealth +0 to their skills if no Stealth skill exists.
+	ensureStealthSkillExistsOnNpc(nodeEntry)
 end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).

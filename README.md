@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v2.8 by Justin Freitas
+StealthTracker v2.9 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -32,6 +32,7 @@ Changelist:
 - v2.5 - Extension name change to comply to standard convention, change load order to 999, do not assess stealth attack if target is hidden.
 - v2.6 - Make the Stealth effect hidden for non friendly npcs.  No duration on stealth effects, per rules... it should last until something stops it. NPE protections from manager calls.  Comment cleanup.  Refactor common logic.
 - v2.7 - Expire stealth in more places now that it doesn't have a duration.  This includes spell casts, spell attacks, spell saves, power saves from the actions tab.  I wired a new handler for this: onCastSave.  Stealth processing only occurs for spell attack rolls.  Fixed an NPC passive perception leak to the players when attacking from stealth without advantage, now the message is local to GM only.  Change to have GM own all effects on CT nodes so that users can't change their attributes (like make it inactive).  Report to the GM only that an attack was made from stealth even if the target sees the attacker (previously a no op).
-- v2.8 - Added an option to allow for broadcast of some StealthTracker info to clients, but it defaults to Off.  It does leak passive perception of monsters which is why it defaults to off.   No more user chat commands, only DM.  Some minor refactoring for cleanliness. Fixed several bugs in the code for expiration of Stealth effect by having all Stealth processing occur on the host only.  The clients will only sent an OOB message when they need processing.  Added an option to expire the Stealth effect with a duration (it's a duration of 2 with the effect init set to tick on current - .1) which defaults to On. 
+- v2.8 - Added an option to allow for broadcast of some StealthTracker info to clients, but it defaults to Off.  It does leak passive perception of monsters which is why it defaults to off.   No more user chat commands, only DM.  Some minor refactoring for cleanliness. Fixed several bugs in the code for expiration of Stealth effect by having all Stealth processing occur on the host only.  The clients will only sent an OOB message when they need processing.  Added an option to expire the Stealth effect with a duration (it's a duration of 2 with the effect init set to tick on current - .1) which defaults to On.
+- v2.9 - When the CT is advanced to the turn of a NPC, if the NPC doesn't already have Stealth in its Skills section, it will be added with a zero modifier so that it is easy to stealth with the NPC on its turn.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
