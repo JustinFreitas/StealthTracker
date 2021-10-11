@@ -19,7 +19,7 @@ STEALTH_TRACKER_ICON = "stealth_icon"
 function onInit()
 	-- Here we name our extension, copyright, and author (Lua handles most special characters as per other languages, where \r is a carriage return).
 	local msg = { sender = "", font = "emotefont", icon = STEALTH_TRACKER_ICON }
-	msg.text = "StealthTracker v2.9 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (10/9/21)"
+	msg.text = "StealthTracker v2.9.1 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (10/11/21)"
 	ChatManager.registerLaunchMessage(msg)
 
 	-- Register StealthTracker Options
@@ -217,17 +217,17 @@ end
 function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not nodeCT then return end
 	local rCurrentActor = ActorManager.resolveActor(nodeCT)
-	if rCurrentActor and isNpc(rCurrentActor) then
-		-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
-		local nodeCreature = DB.findNode(rCurrentActor.sCreatureNode)
-		local rSkillsNode = nodeCreature.getChild("skills")
-		sSkillsValue = rSkillsNode.getText()
-		if not sSkillsValue:find("Stealth [+-]%d") then
-			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
-			local sNewSkillsValue = "Stealth +0, " .. rSkillsNode.getText();
-			-- Trim off any trailing comma followed by zero or more whitespace.
-			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
-		end
+	if not rCurrentActor or not isNpc(rCurrentActor) then return end
+	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
+	local nodeCreature = DB.findNode(rCurrentActor.sCreatureNode)
+	local rSkillsNode = nodeCreature.getChild("skills")
+	if not rSkillsNode then return end -- NPC sheets are not guaranteed to have the Skills node.
+	sSkillsValue = rSkillsNode.getText()
+	if not sSkillsValue:find("Stealth [+-]%d") then
+		-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
+		local sNewSkillsValue = "Stealth +0, " .. rSkillsNode.getText();
+		-- Trim off any trailing comma followed by zero or more whitespace.
+		rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
 	end
 end
 
