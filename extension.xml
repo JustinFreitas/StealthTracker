@@ -3,7 +3,7 @@
 <root version="3.3">
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>2.9.1</version>
+		<version>3.0</version>
 		<loadorder>999</loadorder>
 		<author>Justin Freitas</author>
 		<description>For the current Combat Tracker actor, chat messages will display for each other CT actor whose tracked stealth roll is greater than the current actor's Passive Perception.  Stealth roll values are tracked in the CT actor node via an effect.  This effect will be automatically added/updated on a Stealth roll (always for GM and only when it's a player's turn for them).</description>
@@ -15,7 +15,10 @@
 	<base>
 		<string name="option_header_stealthtracker">StealthTracker (GM)</string>
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire Stealth effect</string>
-		<string name="option_label_STEALTHTRACKER_BROADCAST_INFO">Chat: Broadcast chat info</string>
+		<string name="option_label_STEALTHTRACKER_VISIBILITY">Player: Show Stealth info</string>
+		<string name="option_val_chat_and_effects">Chat and Effects</string>
+		<string name="option_val_effects">Effects</string>
+		<string name="option_val_none">None</string>
 
 		<script name="StealthTracker" file="scripts/stealthtracker.lua" />
 		<icon name="stealth_icon" file="graphics/icons/stealth_icon.png" />
