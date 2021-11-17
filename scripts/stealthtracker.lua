@@ -9,16 +9,9 @@
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 -- Global message type to allow the client to attack from stealth on the host.
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
--- StealthTracker icon identifier
-STEALTH_TRACKER_ICON = "stealth_icon"
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	-- Here we name our extension, copyright, and author (Lua handles most special characters as per other languages, where \r is a carriage return).
-	local msg = { sender = "", font = "emotefont", icon = STEALTH_TRACKER_ICON }
-	msg.text = "StealthTracker v3.0 for FGC/FGU v3.3.15+, 5E" .. "\r" .. "Copyright 2016-21 Justin Freitas (10/17/21)"
-	ChatManager.registerLaunchMessage(msg)
-
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_on", baseval = "on", labels = "option_val_off", values = "off", default = "on" })
@@ -142,7 +135,7 @@ end
 function displayChatMessage(sFormattedText, bSecret)
 	if not sFormattedText then return end
 
-	local msg = {font = "msgfont", icon = STEALTH_TRACKER_ICON, secret = bSecret, text = sFormattedText}
+	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
 
 	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then

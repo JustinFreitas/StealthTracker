@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.0 by Justin Freitas
+StealthTracker v3.1 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -8,7 +8,7 @@ StealthTracker is a Fantasy Grounds (Classic or Unity) v3.3.15+, 5e ruleset base
 
 When a Stealth skill roll is rolled on an actors turn in combat, the stealth roll will automatically be added to the effects of that Combat Tracker actor.  This only happens when combat is active (there is an active actor in the CT).  Also, players are restricted from the effects update when it's not their turn in combat.  When a Stealth effect is added to a CT actor, it's now added with no duration and will be expired (configurable option) by actions like an attack, a cast, a cast save, spell attack, etc.  When the initiative is cleared (via the Combat Tracker menu), all stealth data will be removed from the CT actor names automatically (same functionality as '/st clear' chat command). At any time, the manual approach of editing combat tracker effects will still work for updates.
 
-For StealthTracker to work properly, proper Fantasy Grounds use is required.  For example, at the end of combat, clear the initiative via the Combat Tracker menu.  That way, all CT actors will get scrubbed of StealthTracker data.  It prepares the system for next encounter also by firing the TurnStart event when you press the Next Actor button in the Combat Tracker to begin the encounter.  Simply placing the initiative pointer on an actor in the Combat Tracker will not fire the necessary events for StealthTracker to work properly.  In this case, you can force the check telling who is hidden from the current actor ("does not perceive") by using the chat command "/st".  Additionally, the DM can issue the "/st unaware" command to show what targets are unaware of the current actor (potentially allowing for Advantage on an attack roll).  Any Stealth roll for a non-visible npc current actor in the CT will automatically be made in the tower so that it's not clear what's going on with the hidden actor, even if the setting to show DM rolls is on.
+For StealthTracker to work properly, proper Fantasy Grounds use is required.  For example, at the end of combat, clear the initiative via the Combat Tracker menu.  That way, all CT actors will get scrubbed of StealthTracker data.  It prepares the system for next encounter also by firing the TurnStart event when you press the Next Actor button in the Combat Tracker to begin the encounter.  Simply placing the initiative pointer on an actor in the Combat Tracker will not fire the necessary events for StealthTracker to work properly.  In this case, you can force the check telling who is hidden from the current actor ("does not perceive") by using the chat command "/st".  The st command will also show what targets are unaware of the current actor (potentially allowing for Advantage on an attack roll).  Any Stealth roll for a non-visible npc current actor in the CT will automatically be made in the tower so that it's not clear what's going on with the hidden actor, even if the setting to show DM rolls is on.
 
 The host/DM can issue a "/st clean" command to reset all of the actors in the CT.
 
@@ -37,5 +37,6 @@ Changelist:
 - v2.9 - When the CT is advanced to the turn of a NPC, if the NPC doesn't already have Stealth in its Skills section, it will be added with a zero modifier so that it is easy to stealth with the NPC on its turn.
 - v2.9.1 - Bug fix for error when there is no Skills node on the NPC sheet.
 - v3.0 - This new version supports completely hiding all StealthTracker information (StealthTracker chat messages & StealthTracker effect display) from players.  This way, tables that keep all stealth values hidden won't leak any of the information to the players.  See the new 'Player: Show Stealth info' option in the settings, it's tri-state now (was the old broadcast flag).  Now filters out CT nodes that don't have a type set (often used by DMs for a quick CT entry for a trap or something).  Many refactors for correctness and optimization.
+- v3.1 - Migration to FGU conventions (i.e. launch message to announcement text, etc).
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
