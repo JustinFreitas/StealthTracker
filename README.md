@@ -37,6 +37,6 @@ Changelist:
 - v2.9 - When the CT is advanced to the turn of a NPC, if the NPC doesn't already have Stealth in its Skills section, it will be added with a zero modifier so that it is easy to stealth with the NPC on its turn.
 - v2.9.1 - Bug fix for error when there is no Skills node on the NPC sheet.
 - v3.0 - This new version supports completely hiding all StealthTracker information (StealthTracker chat messages & StealthTracker effect display) from players.  This way, tables that keep all stealth values hidden won't leak any of the information to the players.  See the new 'Player: Show Stealth info' option in the settings, it's tri-state now (was the old broadcast flag).  Now filters out CT nodes that don't have a type set (often used by DMs for a quick CT entry for a trap or something).  Many refactors for correctness and optimization.
-- v3.1 - Migration to FGU conventions (i.e. launch message to announcement text, etc).
+- v3.1 - Migration to FGU conventions (i.e. launch message to announcement text, etc).  Changed the chat command(s) from 'st' or 'stealthtracker' to only 'stealth' due to conflicts between 'st' and 'story' in FGU.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)

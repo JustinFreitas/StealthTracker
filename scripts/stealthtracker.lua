@@ -32,8 +32,9 @@ function onInit()
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
 		-- Register chat commands for host only.
-		Comm.registerSlashHandler("stealthtracker", processChatCommand)
-		Comm.registerSlashHandler("st", processChatCommand)
+		Comm.registerSlashHandler("stealth", processChatCommand)
+		-- TODO: This will be the new way of doing things once they deprecate Comm.registerSlashHandler() which is coming soon.
+		--ChatManager.registerSlashCommand("stealth", processChatCommand)
 
 		-- Register a handler for CT node creation for a place to check to see if Stealth exists on any npc sheet (instead of just on next turn like it is now).
 		DB.addHandler("combattracker.list.*", "onAdd", onCTAdd)
