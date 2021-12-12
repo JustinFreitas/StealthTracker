@@ -207,14 +207,14 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	local rCurrentActor = ActorManager.resolveActor(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
-	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
+	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
 	local nDexMod = nodeCT.getChild("abilities").getChild("dexterity").getChild("bonus").getValue()
 	local sStealthWithMod = "Stealth "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
 	end
-	sStealthWithMod = sStealthWithMod .. nDexMod
 
+	sStealthWithMod = sStealthWithMod .. nDexMod -- Ex: Stealth +0 or Stealth -2
 	local rSkillsNode = nodeCT.getChild("skills")
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
