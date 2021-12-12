@@ -14,7 +14,7 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 function onInit()
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_on", baseval = "on", labels = "option_val_off", values = "off", default = "on" })
+		{ baselabel = "option_val_action_and_duration", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 
@@ -102,9 +102,14 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	return nCountHidden
 end
 
-function checkExpireEffectOption()
+function checkExpireActionAndRound()
 	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "on"
+	return option == "all"
+end
+
+function checkExpireNone()
+	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
+	return option == "none"
 end
 
 function checkVisibilityAll()
@@ -230,7 +235,7 @@ end
 
 -- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 function expireStealthEffectOnCTNode(rActor)
-	if not rActor or not checkExpireEffectOption() then return end
+	if not rActor or checkExpireNone() then return end
 
 	local nodeCT = ActorManager.getCTNode(rActor)
 	if not nodeCT then return end
@@ -807,8 +812,8 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	local nCurrentActorInit = DB.getValue(nodeCT, "initresult", 0)
 	local nEffectExpirationInit = nCurrentActorInit - .1 -- .1 because we want it to tick right after their turn.
 	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).
-	if checkExpireEffectOption() then -- but let the user override that via an option setting.
-		nEffectDuration = 2  -- because the effect init we used is after the user's turn.
+	if checkExpireActionAndRound() then -- but let the user override that via an option setting.
+		nEffectDuration = 2  -- because the effect init we used is after the user's turn.  -- TODO: Consider making this configurable
 	end
 
 	local rActor = ActorManager.resolveActor(nodeCT)
