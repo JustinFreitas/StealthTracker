@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.1 by Justin Freitas
+StealthTracker v3.2 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -19,6 +19,7 @@ Known Limitations:
 
 Future Enhancements:
 - Consider removing or making optional the restriction that a player can only update the PC or NPC they are controlling when it's that actor's turn in the CT.
+- Incorporate light/distance (FGU only)
 
 Changelist:
 - v1.1 - The main purpose of the new version is to incorporate a chat command that displays all of the visible actors in the battle and WHO THEY CAN'T PERCEIVE.
@@ -38,5 +39,6 @@ Changelist:
 - v2.9.1 - Bug fix for error when there is no Skills node on the NPC sheet.
 - v3.0 - This new version supports completely hiding all StealthTracker information (StealthTracker chat messages & StealthTracker effect display) from players.  This way, tables that keep all stealth values hidden won't leak any of the information to the players.  See the new 'Player: Show Stealth info' option in the settings, it's tri-state now (was the old broadcast flag).  Now filters out CT nodes that don't have a type set (often used by DMs for a quick CT entry for a trap or something).  Many refactors for correctness and optimization.
 - v3.1 - Migration to FGU conventions (i.e. launch message to announcement text, etc).  Changed the chat command(s) from 'st' or 'stealthtracker' to only 'stealth' due to conflicts between 'st' and 'story' in FGU.
+- v3.2 - In any NPC CT actor sheet that is modified to have a Stealth skill, it now accounts for the NPC's dexterity modifier (thanks Ludd_G for the suggestion).  Expanded the Stealth effect expiration options (from on/off) to be None, Action, Action and Round (thanks Ludd_G for the suggestion).   
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)

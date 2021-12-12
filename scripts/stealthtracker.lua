@@ -14,7 +14,7 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 function onInit()
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_on", baseval = "on", labels = "option_val_off", values = "off", default = "on" })
+		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 
@@ -102,9 +102,14 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	return nCountHidden
 end
 
-function checkExpireEffectOption()
+function checkExpireActionAndRound()
 	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "on"
+	return option == "all"
+end
+
+function checkExpireNone()
+	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
+	return option == "none"
 end
 
 function checkVisibilityAll()
@@ -207,14 +212,21 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	local rCurrentActor = ActorManager.resolveActor(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
-	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
+	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
+	local nDexMod = nodeCT.getChild("abilities").getChild("dexterity").getChild("bonus").getValue()
+	local sStealthWithMod = "Stealth "
+	if nDexMod >= 0 then
+		sStealthWithMod = sStealthWithMod .. "+"
+	end
+
+	sStealthWithMod = sStealthWithMod .. nDexMod -- Ex: Stealth +0 or Stealth -2
 	local rSkillsNode = nodeCT.getChild("skills")
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
-		DB.setValue(nodeCT, "skills", "string", "Stealth +0")
+		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
 		if not rSkillsNode.getText():find("Stealth [+-]%d") then
 			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
-			local sNewSkillsValue = "Stealth +0, " .. rSkillsNode.getText()
+			local sNewSkillsValue = sStealthWithMod .. ", " .. rSkillsNode.getText()
 			-- Trim off any trailing comma followed by zero or more whitespace.
 			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
 		end
@@ -223,7 +235,7 @@ end
 
 -- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 function expireStealthEffectOnCTNode(rActor)
-	if not rActor or not checkExpireEffectOption() then return end
+	if not rActor or checkExpireNone() then return end
 
 	local nodeCT = ActorManager.getCTNode(rActor)
 	if not nodeCT then return end
@@ -800,8 +812,8 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	local nCurrentActorInit = DB.getValue(nodeCT, "initresult", 0)
 	local nEffectExpirationInit = nCurrentActorInit - .1 -- .1 because we want it to tick right after their turn.
 	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).
-	if checkExpireEffectOption() then -- but let the user override that via an option setting.
-		nEffectDuration = 2  -- because the effect init we used is after the user's turn.
+	if checkExpireActionAndRound() then -- but let the user override that via an option setting.
+		nEffectDuration = 2  -- because the effect init we used is after the user's turn.  -- TODO: Consider making this configurable
 	end
 
 	local rActor = ActorManager.resolveActor(nodeCT)
