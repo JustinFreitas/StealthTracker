@@ -208,13 +208,20 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
+	local nDexMod = nodeCT.getChild("abilities").getChild("dexterity").getChild("bonus").getValue()
+	local sStealthWithMod = "Stealth "
+	if nDexMod >= 0 then
+		sStealthWithMod = sStealthWithMod .. "+"
+	end
+	sStealthWithMod = sStealthWithMod .. nDexMod
+
 	local rSkillsNode = nodeCT.getChild("skills")
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
-		DB.setValue(nodeCT, "skills", "string", "Stealth +0")
+		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
 		if not rSkillsNode.getText():find("Stealth [+-]%d") then
 			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
-			local sNewSkillsValue = "Stealth +0, " .. rSkillsNode.getText()
+			local sNewSkillsValue = sStealthWithMod .. ", " .. rSkillsNode.getText()
 			-- Trim off any trailing comma followed by zero or more whitespace.
 			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
 		end
