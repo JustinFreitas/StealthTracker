@@ -14,7 +14,7 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 function onInit()
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_action_and_duration", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
+		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 
