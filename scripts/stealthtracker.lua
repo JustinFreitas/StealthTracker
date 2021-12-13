@@ -213,7 +213,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = nodeCT.getChild("abilities").getChild("dexterity").getChild("bonus").getValue()
+	local nDexMod = getDexterityBonus(nodeCT)
 	local sStealthWithMod = "Stealth "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -257,6 +257,25 @@ function expireStealthEffectOnCTNode(rActor)
 	if nodeLastEffectWithStealth then
 		EffectManager.expireEffect(nodeCT, nodeLastEffectWithStealth, 0)
 	end
+end
+
+function getDexterityBonus(nodeCT)
+	local nDexMod = 0
+	if not nodeCT then return nDexMod end
+
+	local nodeAbilities = nodeCT.getChild("abilities")
+	if not nodeAbilities then return nDexMod end
+
+	local nodeDexterity = nodeAbilities.getChild("dexterity")
+	if not nodeDexterity then return nDexMod end
+
+	local nodeBonus = nodeDexterity.getChild("bonus")
+	if not nodeBonus then return nDexMod end
+
+	local nBonus = nodeBonus.getValue()
+	if not nBonus then return nDexMod end
+
+	return nBonus
 end
 
 -- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
