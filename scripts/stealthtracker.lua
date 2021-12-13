@@ -17,6 +17,7 @@ function onInit()
 		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
+	-- TODO: Do we want to have an option for 'increased compatibility' where it registers to more than one handler to look for Stealth in the roll string (i.e. Not a skill roll... ).  See ActionsManager.registerResultHandler()
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if User.isHost() then
