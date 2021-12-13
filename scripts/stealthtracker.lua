@@ -483,8 +483,9 @@ end
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
 function isStealthSkillRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	return sRollData and (sRollData:find("%[SKILL%] Stealth") -- This matches the FG skill roll for Stealth.
-							or sRollData:find("Stealth%(")) -- This match is specific to SilentRuin's generic actions extension that has a hide action.
+	return sRollData and
+			(sRollData:find("%[SKILL%] Stealth") or -- This matches the FG skill roll for Stealth.
+				sRollData:find("Stealth%(")) -- This match is specific to SilentRuin's generic actions extension that has a hide action.
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
