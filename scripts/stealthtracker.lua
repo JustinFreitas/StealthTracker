@@ -44,6 +44,7 @@ function onInit()
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
 	-- On extension init, override the skill, attack (also handles spell attack rolls), and castsave result handlers with ours and call the default when we are done with our work (in the override).
 	-- The potential conflict has been mitigated by a chaining technique where we store the current action handler for use in our overridden handler.
+	-- TODO: We might need to register other handlers to enhance compatibility with extensions that have custom stealth rolls (i.e. Custom Actions)
 	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
 	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
