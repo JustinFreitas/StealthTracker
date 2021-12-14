@@ -336,21 +336,6 @@ function getPassivePerceptionNumber(rActor)
 	return nPP
 end
 
-function getRollTotal(rRoll)
-	local total = 0
-	if not rRoll or not rRoll.aDice then return total end
-
-	for _, die in ipairs(rRoll.aDice) do
-		total = total + die.result
-	end
-
-	if rRoll.nMod then
-		total = total + rRoll.nMod
-	end
-
-	return total
-end
-
 -- Function that walks the effects for a given CT node and extracts the last 'Stealth: X' effect stealth value.
 function getStealthNumberFromEffects(nodeCT)
 	if not nodeCT then return end
@@ -633,10 +618,10 @@ function onRollSkill(rSource, rTarget, rRoll)
 
 	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and #(rRoll.aDice) > 0 and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
+	if rSource.sCTNode ~= "" and rRoll.aDice and #(rRoll.aDice) > 0 and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRollStealthTracker() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
 		-- This takes advantage/disadvantage into account, despite the strange indexing.
-		local nStealthTotal = getRollTotal(rRoll)
+		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if User.isHost() then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
