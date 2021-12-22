@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.2.2 by Justin Freitas
+StealthTracker v3.2.3 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -42,5 +42,6 @@ Changelist:
 - v3.2 - In any NPC CT actor sheet that is modified to have a Stealth skill, it now accounts for the NPC's dexterity modifier (thanks Ludd_G for the suggestion).  Expanded the Stealth effect expiration options (from on/off) to be None, Action, Action and Round (thanks Ludd_G for the suggestion).
 - v3.2.1 - Fix and protection against null pointer exception reported by UnlivingLuke.
 - v3.2.2 - Fix to account for all dice in the stealth skill roll when computing total for effect.
+- v3.2.3 - Improve dice check in skill handler by using common code.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
