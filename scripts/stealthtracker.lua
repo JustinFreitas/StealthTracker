@@ -618,7 +618,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 
 	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and rRoll.aDice and #(rRoll.aDice) > 0 and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRollStealthTracker() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
 		-- This takes advantage/disadvantage into account, despite the strange indexing.
 		local nStealthTotal = ActionsManager.total(rRoll)
