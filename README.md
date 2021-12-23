@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.2.3 by Justin Freitas
+StealthTracker v3.3 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -43,5 +43,6 @@ Changelist:
 - v3.2.1 - Fix and protection against null pointer exception reported by UnlivingLuke.
 - v3.2.2 - Fix to account for all dice in the stealth skill roll when computing total for effect.
 - v3.2.3 - Improve dice check in skill handler by using common code.
+- v3.3 - Added compatibility with the Hide action of the Generic Actions extension by request of BushViper.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)

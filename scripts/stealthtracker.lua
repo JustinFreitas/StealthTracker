@@ -54,6 +54,12 @@ function onInit()
 	ActionPower.onCastSaveStealthTracker = ActionPower.onCastSave
 	ActionPower.onCastSave = onRollCastSave
 	ActionsManager.registerResultHandler("castsave", onRollCastSave)
+	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
+	if ActionGeneral and ActionGeneral.onRoll then
+		ActionGeneral.onRollStealthTracker = ActionGeneral.onRoll
+		ActionGeneral.onRoll = onRollGenericAction
+		ActionsManager.registerResultHandler("genactroll", onRollGenericAction);
+	end
 end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
@@ -583,6 +589,14 @@ function onRollCastSave(rSource, rTarget, rRoll)
 	expireStealthEffectOnCTNode(rSource)
 end
 
+function onRollGenericAction(rSource, rTarget, rRoll)
+	local bProcessStealth = rRoll and rRoll.sSourceCheck == "Stealth"
+	ActionGeneral.onRollStealthTracker(rSource, rTarget, rRoll)
+	if not bProcessStealth then return end
+
+	processStealth(rSource, rRoll)
+end
+
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
@@ -604,34 +618,9 @@ function onRollSkill(rSource, rTarget, rRoll)
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
 	ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll)
-	-- If this isn't a Stealth roll, forgo StealthTracker processing.
 	if not bProcessStealth then return end
 
-	-- Get the node for the current CT actor.
-	local nodeActiveCT = CombatManager.getActiveCT()
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
-	if not nodeActiveCT then return end
-
-	local sActiveCTName = DB.getText(nodeActiveCT, "name", "")
-	-- If there was no creature node from the source, forgo StealthTracker processing.
-	if not nodeCreature then return end
-
-	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
-	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
-		-- Calculate the stealth roll so that it's available to put in the creature effects.  After the default ActionSkill.onRollStealthTracker() has been called (above), there will be only one dice and that will be one for adv/dis, etc.
-		-- This takes advantage/disadvantage into account, despite the strange indexing.
-		local nStealthTotal = ActionsManager.total(rRoll)
-		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
-		if User.isHost() then
-			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
-			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
-		elseif isPlayerStealthInfoDisabled() then
-			displayChatMessage("The DM has StealthTracker info set to hidden.  Use the dice tower to make your Stealth roll.", false)
-		else
-			notifyUpdateStealth(rSource.sCTNode, nStealthTotal)
-		end
-	end
+	processStealth(rSource, rRoll)
 end
 
 -- This function is one that the Combat Tracker calls if present at the start of a creatures turn.  Wired up in onInit() for the host only.
@@ -815,6 +804,34 @@ function processHostOnlySubcommands(sSubcommand)
 
 	-- Fallthrough/unrecognized subcommand
 	return sSubcommand
+end
+
+function processStealth(rSource, rRoll)
+	local nodeCreature = ActorManager.getCreatureNode(rSource)
+	-- Get the node for the current CT actor.
+	local nodeActiveCT = CombatManager.getActiveCT()
+	-- If there was no active CT actor/node, forgo StealthTracker processing.
+	if not nodeActiveCT then return end
+
+	local sActiveCTName = DB.getText(nodeActiveCT, "name", "")
+	-- If there was no creature node from the source, forgo StealthTracker processing.
+	if not nodeCreature then return end
+
+	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
+	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
+		-- Calculate the stealth roll so that it's available to put in the creature effects.
+		local nStealthTotal = ActionsManager.total(rRoll)
+		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
+		if User.isHost() then
+			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
+			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
+		elseif isPlayerStealthInfoDisabled() then
+			displayChatMessage("The DM has StealthTracker info set to hidden.  Use the dice tower to make your Stealth roll.", false)
+		else
+			notifyUpdateStealth(rSource.sCTNode, nStealthTotal)
+		end
+	end
 end
 
 -- Function to encapsulate the setting of the name with stealth value.
