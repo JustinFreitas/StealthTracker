@@ -849,7 +849,7 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 
 	-- Then, add a new effect with the provided stealth value and make it be by user so that he/she can delete it from the CT on their own, if necessary.
 	-- NOTE: When using addEffect to set effects, you must use the sCTNode and NOT the sCreatureNode (no effects on PC character sheet like in CT).
-	local sEffectName = string.format(LOCALIZED_STEALTH .. ": %d", nStealthTotal)
+	local sEffectName = string.format("%s: %d", LOCALIZED_STEALTH, nStealthTotal)
 	local nCurrentActorInit = DB.getValue(nodeCT, "initresult", 0)
 	local nEffectExpirationInit = nCurrentActorInit - .1 -- .1 because we want it to tick right after their turn.
 	local nEffectDuration = 0 -- according to 5e, actor should remain hidden until they do something to become visible (i.e. attack).
