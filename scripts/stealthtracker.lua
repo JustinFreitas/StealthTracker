@@ -812,19 +812,16 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function processStealth(rSource, rRoll)
-	local nodeCreature = ActorManager.getCreatureNode(rSource)
+	local nodeCT = ActorManager.getCTNode(rSource)
+	if not nodeCT then return end
+
 	-- Get the node for the current CT actor.
 	local nodeActiveCT = CombatManager.getActiveCT()
 	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if not nodeActiveCT then return end
 
-	local sActiveCTName = DB.getText(nodeActiveCT, "name", "")
-	-- If there was no creature node from the source, forgo StealthTracker processing.
-	if not nodeCreature then return end
-
-	local sSourceCreatureNodeName = DB.getText(nodeCreature, "name", "")
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or sSourceCreatureNodeName == sActiveCTName) then
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or nodeCT == nodeActiveCT) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.
 		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
