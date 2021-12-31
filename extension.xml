@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3">
-	<announcement text="StealthTracker v3.3 for FGC/FGU v3.3.15+, 5E\rCopyright 2016-21 Justin Freitas (12/28/21)" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.4 for FGC/FGU v3.3.15+, 5E\rCopyright 2016-21 Justin Freitas (12/31/21)" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.3</version>
+		<version>3.4</version>
 		<loadorder>999</loadorder>
 		<author>Justin Freitas</author>
 		<description>For the current Combat Tracker actor, chat messages will display for each other CT actor whose tracked stealth roll is greater than the current actor's Passive Perception.  Stealth roll values are tracked in the CT actor node via an effect.  This effect will be automatically added/updated on a Stealth roll (always for GM and only when it's a player's turn for them).</description>

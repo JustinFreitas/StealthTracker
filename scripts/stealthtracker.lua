@@ -59,6 +59,11 @@ function onInit()
 	ActionPower.onCastSaveStealthTracker = ActionPower.onCastSave
 	ActionPower.onCastSave = onRollCastSave
 	ActionsManager.registerResultHandler("castsave", onRollCastSave)
+
+	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
+	if ActionGeneral then
+		ActionsManager.registerPostRollHandler("genactroll", onGenericActionPostRoll)
+	end
 end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
@@ -574,6 +579,13 @@ function onDropEvent(rSource, rTarget, draginfo)
 
 	-- This is required, otherwise, the wired drop handler fires twice.  It terminates the default drop processing.
 	return true
+end
+
+-- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
+function onGenericActionPostRoll(rSource, rRoll)
+	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == "genactroll" and rRoll.sGenericAction == "Hide" then
+		processStealth(rSource, rRoll)
+	end
 end
 
 -- Attack roll handler
