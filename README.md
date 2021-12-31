@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.3 by Justin Freitas
+StealthTracker v3.4 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -43,6 +43,7 @@ Changelist:
 - v3.2.1 - Fix and protection against null pointer exception reported by UnlivingLuke.
 - v3.2.2 - Fix to account for all dice in the stealth skill roll when computing total for effect.
 - v3.2.3 - Improve dice check in skill handler by using common code.
-- v3.3 - Use looked up, translated strings for 'Stealth' and 'Dexterity' so that the StealthTracker functionality will work for localized rulesets.
+- v3.3 - Use looked up, translated strings for 'Stealth' and 'Dexterity' so that the StealthTracker functionality will work for localized rulesets.  Thanks to shoebill for the suggestion.
+- v3.4 - Added support for the Generic Action extension Hide action to be processed like Stealth rolls are.  Thanks to BushViper and plap3014 for the suggestion and SilentRuin for support.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
