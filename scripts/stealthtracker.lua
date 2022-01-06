@@ -584,6 +584,7 @@ end
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
 	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == "genactroll" and rRoll.sGenericAction == "Hide" then
+		ActionsManager2.decodeAdvantage(rRoll)
 		processStealth(rSource, rRoll)
 	end
 end

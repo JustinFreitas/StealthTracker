@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.4 by Justin Freitas
+StealthTracker v3.4.1 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -16,6 +16,7 @@ Known Limitations:
 - The StealthTracker hidden check will only fire when the actor's turn is started via the CT DownArrow/NextTurn button.  Dragging the turn pointer to a new actor will not trigger the checks.
 - In a multi-target attack from stealth (like maybe a twinned spell attack from a sorcerer or something similar), only the first roll is accounted for in the analysis.
 - With script, I can't force a dice roll into the tower.  Maybe this is possible some other way, but right now, I can only trap the condition and put a chat message up to have the player roll in the tower (only applicable when the 'None' value is selected for the 'Player: Show Stealth info' option) and then ignore that particular roll.
+- When StealthTracker processes a Hide action from the Generic Actions extension, the effect is assigned before the roll output is displayed.  With a normal Stealth roll, the effect is assigned afterwards.  Not an issue but a difference worth noting.
 
 Future Enhancements:
 - Consider removing or making optional the restriction that a player can only update the PC or NPC they are controlling when it's that actor's turn in the CT.
@@ -45,5 +46,6 @@ Changelist:
 - v3.2.3 - Improve dice check in skill handler by using common code.
 - v3.3 - Use looked up, translated strings for 'Stealth' and 'Dexterity' so that the StealthTracker functionality will work for localized rulesets.  Thanks to shoebill for the suggestion.
 - v3.4 - Added support for the Generic Action extension Hide action to be processed like Stealth rolls are.  Thanks to BushViper and plap3014 for the suggestion and SilentRuin for support.
+- v3.4.1 - Decode adv/disadv in the post roll handler for the Generic Actions extension compatibility before using the roll total to assign a Stealth effect.  Special thanks to Ludd_G for the bug report.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
