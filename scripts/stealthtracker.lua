@@ -468,8 +468,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
 function isStealthSkillRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[skill%] " .. LOCALIZED_STEALTH_LOWER
-	return sRollData and sRollData:lower():match(pattern)
+	return sRollData and sRollData:lower():match("%[skill%] " .. LOCALIZED_STEALTH_LOWER)
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
