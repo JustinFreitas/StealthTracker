@@ -113,18 +113,15 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 end
 
 function checkExpireActionAndRound()
-	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "all"
+	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "all"
 end
 
 function checkExpireNone()
-	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "none"
+	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "none"
 end
 
 function checkVisibilityAll()
-	local option = OptionsManager.getOption("STEALTHTRACKER_VISIBILITY"):lower()
-	return option == "all"
+	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "all"
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
