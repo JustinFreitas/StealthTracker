@@ -483,13 +483,12 @@ function isTargetHiddenFromSource(rSource, rTarget)
 	if nStealthTarget ~= nil then
 		local nPPSource = getPassivePerceptionNumber(rSource)
 		if nPPSource ~= nil and nPPSource < nStealthTarget then
-			local rHiddenActor = {
+			return {
 				source = rSource,
 				target = rTarget,
 				stealth = nStealthTarget,
 				sourcePP = nPPSource
 			}
-			return rHiddenActor
 		end
 	end
 
