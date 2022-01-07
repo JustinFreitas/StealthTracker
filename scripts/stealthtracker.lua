@@ -11,13 +11,17 @@ OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 -- Declare a global to hold the localized stealth string, initialized for locale in onInit()
 LOCALIZED_DEXTERITY = "Dexterity"
+LOCALIZED_DEXTERITY_LOWER = "dexterity"
 LOCALIZED_STEALTH = "Stealth"
+LOCALIZED_STEALTH_LOWER = "stealth"
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	-- Translations
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
+	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
+	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
@@ -98,7 +102,7 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 											ActorManager.getDisplayName(rHiddenTarget.source),
 											ActorManager.getDisplayName(rIterationActor),
 											rHiddenTarget.sourcePP,
-											LOCALIZED_STEALTH:lower(),
+											LOCALIZED_STEALTH_LOWER,
 											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
@@ -233,10 +237,11 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
-		local pattern = LOCALIZED_STEALTH:lower() .. " [+-]%d"
-		if not rSkillsNode.getText():lower():find(pattern) then
+		local pattern = LOCALIZED_STEALTH_LOWER .. " [+-]%d"
+		local sSkills = rSkillsNode.getText()
+		if not sSkills:lower():find(pattern) then
 			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
-			local sNewSkillsValue = sStealthWithMod .. ", " .. rSkillsNode.getText()
+			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
 			-- Trim off any trailing comma followed by zero or more whitespace.
 			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
 		end
@@ -354,7 +359,7 @@ function getStealthValueFromEffectNode(nodeEffect)
 	local aEffectComponents = EffectManager.parseEffect(sEffectLabel)
 
 	-- Take the last Stealth value found, in case it was manually entered and accidentally duplicated (iterate through all of the components).
-	local pattern = "^%s*" .. LOCALIZED_STEALTH:lower() .. ":%s*(%-?%d+)%s*$"
+	local pattern = "^%s*" .. LOCALIZED_STEALTH_LOWER .. ":%s*(%-?%d+)%s*$"
 	for _, component in ipairs(aEffectComponents) do
 		local sMatch = string.match(component, pattern)
 		if sMatch then
@@ -428,7 +433,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[check%] " .. LOCALIZED_DEXTERITY:lower()
+	local pattern = "%[check%] " .. LOCALIZED_DEXTERITY_LOWER
 	return sRollData and sRollData:lower():find(pattern)
 end
 
@@ -444,8 +449,7 @@ function isNpc(rActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	local option = OptionsManager.getOption("STEALTHTRACKER_VISIBILITY"):lower()
-	return option == "none"
+	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "none"
 end
 
 function isSecretMessage(rSource)
@@ -461,7 +465,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
 function isStealthSkillRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[skill%] " .. LOCALIZED_STEALTH:lower()
+	local pattern = "%[skill%] " .. LOCALIZED_STEALTH_LOWER
 	return sRollData and sRollData:lower():find(pattern)
 end
 
