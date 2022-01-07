@@ -283,6 +283,7 @@ function getOrderedEffectsTableFromCTNode(nodeCT)
 	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
 		table.insert(aCTNodes, nodeEffect)
 	end
+
 	table.sort(aCTNodes, function (a, b) return a.getName() < b.getName() end)
 	return aCTNodes
 end
@@ -436,8 +437,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[check%] " .. LOCALIZED_DEXTERITY_LOWER
-	return sRollData and sRollData:lower():match(pattern)
+	return sRollData and sRollData:lower():match("%[check%] " .. LOCALIZED_DEXTERITY_LOWER)
 end
 
 -- Function that checks an actor record to see if it's a friend (faction).  Can take an actor record or a node.
