@@ -1,5 +1,5 @@
--- (c) Copyright Justin Freitas 2021+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2021 SmiteWorks USA LLC.
+-- (c) Copyright Justin Freitas 2022+ except where explicitly stated otherwise.
+-- Fantasy Grounds is Copyright (c) 2004-2022 SmiteWorks USA LLC.
 -- Copyright to other material within this file may be held by other Individuals and/or Entities.
 -- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
 -- transmitted or otherwise manipulated in ANY way without the explicit written consent of
@@ -47,8 +47,6 @@ function onInit()
 
 		-- Register chat commands for host only.
 		Comm.registerSlashHandler("stealth", processChatCommand)
-		-- TODO: This will be the new way of doing things once they deprecate Comm.registerSlashHandler() which is coming soon.
-		--ChatManager.registerSlashCommand("stealth", processChatCommand)
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
