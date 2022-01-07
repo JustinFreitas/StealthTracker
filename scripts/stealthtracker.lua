@@ -132,7 +132,6 @@ end
 -- Function that walks the CT nodes and deletes the stealth effects from them.
 function clearAllStealthTrackerDataFromCT()
 	-- Walk the CT resetting all names.
-	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _, nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
 		deleteAllStealthEffects(nodeCT)
 	end
@@ -154,7 +153,6 @@ function displayChatMessage(sFormattedText, bSecret)
 	if not sFormattedText then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
-
 	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
