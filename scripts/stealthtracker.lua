@@ -42,9 +42,6 @@ function onInit()
 		Comm.registerSlashHandler("stealth", processChatCommand)
 		-- TODO: This will be the new way of doing things once they deprecate Comm.registerSlashHandler() which is coming soon.
 		--ChatManager.registerSlashCommand("stealth", processChatCommand)
-
-		-- Register a handler for CT node creation for a place to check to see if Stealth exists on any npc sheet (instead of just on next turn like it is now).
-		DB.addHandler("combattracker.list.*", "onAdd", onCTAdd)
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
@@ -555,11 +552,6 @@ end
 function onCombatResetEvent()
 	-- We are exiting initiative/combat, so clear all StealthTracker data from CT actors.
 	clearAllStealthTrackerDataFromCT()
-end
-
--- Handler for when an actor is added to the Combat Tracker.  Registered in onInit().
-function onCTAdd(nodeAdded)
-	ensureStealthSkillExistsOnNpc(nodeAdded)
 end
 
 -- Fires when something is dropped on the CT
