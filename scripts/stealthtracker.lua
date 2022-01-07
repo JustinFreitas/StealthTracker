@@ -240,11 +240,10 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
-		local pattern = LOCALIZED_STEALTH .. " [+-]%d"
 		local sSkills = rSkillsNode.getText()
 		-- Skip if Stealth is already there because resetting it due to dex change mid-combat would be rare and might not account for other modifiers.
-		if not sSkills:match(pattern) then
-			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
+		if not sSkills:match(LOCALIZED_STEALTH .. " [+-]%d") then
+			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
 			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
 			-- Trim off any trailing comma followed by zero or more whitespace.
 			rSkillsNode.setValue(sNewSkillsValue:gMatch("^%s*(.-),%s*$", "%1"))
