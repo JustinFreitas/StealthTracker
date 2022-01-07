@@ -11,15 +11,15 @@ OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 -- Declare a global to hold the localized stealth string, initialized for locale in onInit()
 LOCALIZED_DEXTERITY = "Dexterity"
-LOCALIZED_DEXTERITY_LOWER = "dexterity"
+LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
-LOCALIZED_STEALTH_LOWER = "stealth"
+LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 -- Global to hold User.isHost()
 USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	-- Translations
+	-- Globals: Translations and isHost
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
