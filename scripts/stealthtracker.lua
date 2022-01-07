@@ -237,13 +237,14 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
-		local pattern = LOCALIZED_STEALTH_LOWER .. " [+-]%d"
+		local pattern = LOCALIZED_STEALTH .. " [+-]%d"
 		local sSkills = rSkillsNode.getText()
-		if not sSkills:lower():find(pattern) then
+		-- Skip if Stealth is already there because resetting it due to dex change mid-combat would be rare and might not account for other modifiers.
+		if not sSkills:match(pattern) then
 			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
 			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
 			-- Trim off any trailing comma followed by zero or more whitespace.
-			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
+			rSkillsNode.setValue(sNewSkillsValue:gMatch("^%s*(.-),%s*$", "%1"))
 		end
 	end
 end
@@ -434,7 +435,7 @@ end
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
 	local pattern = "%[check%] " .. LOCALIZED_DEXTERITY_LOWER
-	return sRollData and sRollData:lower():find(pattern)
+	return sRollData and sRollData:lower():match(pattern)
 end
 
 -- Function that checks an actor record to see if it's a friend (faction).  Can take an actor record or a node.
@@ -466,7 +467,7 @@ end
 function isStealthSkillRoll(sRollData)
 	-- % is the escape character in Lua patterns.
 	local pattern = "%[skill%] " .. LOCALIZED_STEALTH_LOWER
-	return sRollData and sRollData:lower():find(pattern)
+	return sRollData and sRollData:lower():match(pattern)
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
