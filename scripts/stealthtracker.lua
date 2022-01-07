@@ -14,6 +14,8 @@ LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = "dexterity"
 LOCALIZED_STEALTH = "Stealth"
 LOCALIZED_STEALTH_LOWER = "stealth"
+-- Global to hold User.isHost()
+USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
@@ -22,6 +24,7 @@ function onInit()
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+	USER_ISHOST = User.isHost()
 
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
@@ -30,7 +33,7 @@ function onInit()
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
-	if User.isHost() then
+	if USER_ISHOST then
 		-- Here is where we register the onTurnStartEvent. We can register many of these which is useful. It adds them to a list and iterates through them in the order they were added.
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		-- This allows a hook for us to reset all of the CT actor names upon clearing of initiative/combat via CT menu.
@@ -541,7 +544,7 @@ end
 function onDropEvent(rSource, rTarget, draginfo)
 
 	-- If rSource isn't nil, then the drag came from a sheet and not the chat.
-	if rSource or not User.isHost() or not rTarget or not rTarget.sCTNode or not draginfo then return true end
+	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return true end
 
 	local sDragInfoData = draginfo.getStringData()
 	if not sDragInfoData or sDragInfoData == "" then return true end
@@ -568,8 +571,7 @@ end
 function onRollAttack(rSource, rTarget, rRoll)
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
-		local bSecret = User.isHost()
-		displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", bSecret)
+		displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", USER_ISHOST)
 	end
 
 	-- Call the stored (during initialization in onInit()) attack roll handler.
@@ -659,7 +661,7 @@ end
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
 function processAttackFromStealth(rSource, rTarget)
 	-- If the source is nil but rTarget is present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
-	if not rSource and User.isHost() then
+	if not rSource and USER_ISHOST then
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then return end
 
@@ -675,7 +677,7 @@ function processAttackFromStealth(rSource, rTarget)
 
 	-- This works on the client side even though the effect isn't visible.  Should probably do this on the host
 	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
-	if not User.isHost() then
+	if not USER_ISHOST then
 		-- We'll have to marshall the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
 		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "")
 		return
@@ -809,11 +811,11 @@ function processStealth(rSource, rRoll)
 	if not nodeActiveCT then return end
 
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or nodeCT == nodeActiveCT) then
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (USER_ISHOST or nodeCT == nodeActiveCT) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.
 		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
-		if User.isHost() then
+		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
 			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
 		elseif isPlayerStealthInfoDisabled() then
