@@ -1,5 +1,5 @@
--- (c) Copyright Justin Freitas 2021+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2021 SmiteWorks USA LLC.
+-- (c) Copyright Justin Freitas 2022+ except where explicitly stated otherwise.
+-- Fantasy Grounds is Copyright (c) 2004-2022 SmiteWorks USA LLC.
 -- Copyright to other material within this file may be held by other Individuals and/or Entities.
 -- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
 -- transmitted or otherwise manipulated in ANY way without the explicit written consent of
@@ -11,13 +11,20 @@ OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 -- Declare a global to hold the localized stealth string, initialized for locale in onInit()
 LOCALIZED_DEXTERITY = "Dexterity"
+LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
+LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+-- Global to hold User.isHost()
+USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	-- Translations
+	-- Globals: Translations and isHost
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
+	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
+	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+	USER_ISHOST = User.isHost()
 
 	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
@@ -26,7 +33,7 @@ function onInit()
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
-	if User.isHost() then
+	if USER_ISHOST then
 		-- Here is where we register the onTurnStartEvent. We can register many of these which is useful. It adds them to a list and iterates through them in the order they were added.
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		-- This allows a hook for us to reset all of the CT actor names upon clearing of initiative/combat via CT menu.
@@ -40,8 +47,6 @@ function onInit()
 
 		-- Register chat commands for host only.
 		Comm.registerSlashHandler("stealth", processChatCommand)
-		-- TODO: This will be the new way of doing things once they deprecate Comm.registerSlashHandler() which is coming soon.
-		--ChatManager.registerSlashCommand("stealth", processChatCommand)
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
@@ -98,7 +103,7 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 											ActorManager.getDisplayName(rHiddenTarget.source),
 											ActorManager.getDisplayName(rIterationActor),
 											rHiddenTarget.sourcePP,
-											LOCALIZED_STEALTH:lower(),
+											LOCALIZED_STEALTH_LOWER,
 											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
@@ -113,24 +118,20 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 end
 
 function checkExpireActionAndRound()
-	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "all"
+	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "all"
 end
 
 function checkExpireNone()
-	local option = OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT"):lower()
-	return option == "none"
+	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "none"
 end
 
 function checkVisibilityAll()
-	local option = OptionsManager.getOption("STEALTHTRACKER_VISIBILITY"):lower()
-	return option == "all"
+	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "all"
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
 function clearAllStealthTrackerDataFromCT()
 	-- Walk the CT resetting all names.
-	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _, nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
 		deleteAllStealthEffects(nodeCT)
 	end
@@ -152,7 +153,6 @@ function displayChatMessage(sFormattedText, bSecret)
 	if not sFormattedText then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
-
 	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
@@ -225,7 +225,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = getDexterityBonus(nodeCT)
+	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, "dexterity")
 	local sStealthWithMod = LOCALIZED_STEALTH .. " "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -236,12 +236,13 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
 	else
-		local pattern = LOCALIZED_STEALTH:lower() .. " [+-]%d"
-		if not rSkillsNode.getText():lower():find(pattern) then
-			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting).
-			local sNewSkillsValue = sStealthWithMod .. ", " .. rSkillsNode.getText()
+		local sSkills = rSkillsNode.getText()
+		-- Skip if Stealth is already there because resetting it due to dex change mid-combat would be rare and might not account for other modifiers.
+		if not sSkills:match(LOCALIZED_STEALTH .. " [+-]%d") then
+			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
+			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
 			-- Trim off any trailing comma followed by zero or more whitespace.
-			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
+			rSkillsNode.setValue(sNewSkillsValue:gMatch("^%s*(.-),%s*$", "%1"))
 		end
 	end
 end
@@ -272,31 +273,13 @@ function expireStealthEffectOnCTNode(rActor)
 	end
 end
 
-function getDexterityBonus(nodeCT)
-	local nDexMod = 0
-	if not nodeCT then return nDexMod end
-
-	local nodeAbilities = nodeCT.getChild("abilities")
-	if not nodeAbilities then return nDexMod end
-
-	local nodeDexterity = nodeAbilities.getChild("dexterity")
-	if not nodeDexterity then return nDexMod end
-
-	local nodeBonus = nodeDexterity.getChild("bonus")
-	if not nodeBonus then return nDexMod end
-
-	local nBonus = nodeBonus.getValue()
-	if not nBonus then return nDexMod end
-
-	return nBonus
-end
-
 -- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
 function getOrderedEffectsTableFromCTNode(nodeCT)
 	local aCTNodes = {}
 	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
 		table.insert(aCTNodes, nodeEffect)
 	end
+
 	table.sort(aCTNodes, function (a, b) return a.getName() < b.getName() end)
 	return aCTNodes
 end
@@ -376,7 +359,7 @@ function getStealthValueFromEffectNode(nodeEffect)
 	local aEffectComponents = EffectManager.parseEffect(sEffectLabel)
 
 	-- Take the last Stealth value found, in case it was manually entered and accidentally duplicated (iterate through all of the components).
-	local pattern = "^%s*" .. LOCALIZED_STEALTH:lower() .. ":%s*(%-?%d+)%s*$"
+	local pattern = "^%s*" .. LOCALIZED_STEALTH_LOWER .. ":%s*(%-?%d+)%s*$"
 	for _, component in ipairs(aEffectComponents) do
 		local sMatch = string.match(component, pattern)
 		if sMatch then
@@ -450,8 +433,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[check%] " .. LOCALIZED_DEXTERITY:lower()
-	return sRollData and sRollData:lower():find(pattern)
+	return sRollData and sRollData:lower():match("%[check%] " .. LOCALIZED_DEXTERITY_LOWER)
 end
 
 -- Function that checks an actor record to see if it's a friend (faction).  Can take an actor record or a node.
@@ -466,8 +448,7 @@ function isNpc(rActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	local option = OptionsManager.getOption("STEALTHTRACKER_VISIBILITY"):lower()
-	return option == "none"
+	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "none"
 end
 
 function isSecretMessage(rSource)
@@ -483,8 +464,7 @@ end
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
 function isStealthSkillRoll(sRollData)
 	-- % is the escape character in Lua patterns.
-	local pattern = "%[skill%] " .. LOCALIZED_STEALTH:lower()
-	return sRollData and sRollData:lower():find(pattern)
+	return sRollData and sRollData:lower():match("%[skill%] " .. LOCALIZED_STEALTH_LOWER)
 end
 
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
@@ -499,13 +479,12 @@ function isTargetHiddenFromSource(rSource, rTarget)
 	if nStealthTarget ~= nil then
 		local nPPSource = getPassivePerceptionNumber(rSource)
 		if nPPSource ~= nil and nPPSource < nStealthTarget then
-			local rHiddenActor = {
+			return {
 				source = rSource,
 				target = rTarget,
 				stealth = nStealthTarget,
 				sourcePP = nPPSource
 			}
-			return rHiddenActor
 		end
 	end
 
@@ -558,7 +537,7 @@ end
 function onDropEvent(rSource, rTarget, draginfo)
 
 	-- If rSource isn't nil, then the drag came from a sheet and not the chat.
-	if rSource or not User.isHost() or not rTarget or not rTarget.sCTNode or not draginfo then return true end
+	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return true end
 
 	local sDragInfoData = draginfo.getStringData()
 	if not sDragInfoData or sDragInfoData == "" then return true end
@@ -585,8 +564,7 @@ end
 function onRollAttack(rSource, rTarget, rRoll)
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
-		local bSecret = User.isHost()
-		displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", bSecret)
+		displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", USER_ISHOST)
 	end
 
 	-- Call the stored (during initialization in onInit()) attack roll handler.
@@ -676,7 +654,7 @@ end
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
 function processAttackFromStealth(rSource, rTarget)
 	-- If the source is nil but rTarget is present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
-	if not rSource and User.isHost() then
+	if not rSource and USER_ISHOST then
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then return end
 
@@ -692,7 +670,7 @@ function processAttackFromStealth(rSource, rTarget)
 
 	-- This works on the client side even though the effect isn't visible.  Should probably do this on the host
 	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
-	if not User.isHost() then
+	if not USER_ISHOST then
 		-- We'll have to marshall the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
 		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "")
 		return
@@ -826,11 +804,11 @@ function processStealth(rSource, rRoll)
 	if not nodeActiveCT then return end
 
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (User.isHost() or nodeCT == nodeActiveCT) then
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (USER_ISHOST or nodeCT == nodeActiveCT) then
 		-- Calculate the stealth roll so that it's available to put in the creature effects.
 		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
-		if User.isHost() then
+		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
 			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
 		elseif isPlayerStealthInfoDisabled() then
