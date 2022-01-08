@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.4.2 by Justin Freitas
+StealthTracker v3.4.3 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -48,5 +48,6 @@ Changelist:
 - v3.4 - Added support for the Generic Action extension Hide action to be processed like Stealth rolls are.  Thanks to BushViper and plap3014 for the suggestion and SilentRuin for support.
 - v3.4.1 - Decode adv/disadv in the post roll handler for the Generic Actions extension compatibility before using the roll total to assign a Stealth effect.  Special thanks to Ludd_G for the bug report.
 - v3.4.2 - Account for a change in FG CT onAdd handler behavior and don't assign the NPC sheet Stealth skill at that time due to uninitialized attributes.  Do it onTurnStart instead where the attributes are correct until the issue with FG is resolved.  Thanks again to Ludd_G for the report.
+- v3.4.3 - Various refactoring and improvement in the code, such as utilization of common FG functions to accomplish tasks instead of homegrown logic.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
