@@ -242,7 +242,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
 			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
 			-- Trim off any trailing comma followed by zero or more whitespace.
-			rSkillsNode.setValue(sNewSkillsValue:gMatch("^%s*(.-),%s*$", "%1"))
+			rSkillsNode.setValue(sNewSkillsValue:gmatch("^%s*(.-),%s*$", "%1"))
 		end
 	end
 end
