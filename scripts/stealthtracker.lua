@@ -107,7 +107,7 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 											rHiddenTarget.stealth)
 				-- Make the message GM only if this iteration's CT token isn't visible.
 				-- If the actor being checked is a npc and not visible, make the chat entry secret.
-				local bSecret = isSecretMessage(rCurrentActor) or CombatManager.isCTHidden(nodeCT)
+				local bSecret = isSecretMessage(rCurrentActor)
 				displayChatMessage(sText, bSecret)
 				nCountHidden = nCountHidden + 1
 			end
@@ -159,6 +159,11 @@ function displayChatMessage(sFormattedText, bSecret)
 	else
 		Comm.deliverChatMessage(msg)
 	end
+end
+
+function displayUnconsciousChatMessage(nodeCT)
+	local sText = string.format("'%s' is unconscious, skipping StealthTracker processing.", ActorManager.getDisplayName(nodeCT))
+	displayChatMessage(sText, isSecretMessage(nodeCT))
 end
 
 -- Function to display as a local chat message (not broadcast) the potentially unaware targets of an attacker that is stealthing, which might mean the attacker could take advantage on the roll.
@@ -430,6 +435,16 @@ function hasValidType(nodeCT)
 	return nodeType and nodeType.getText() ~= ""
 end
 
+-- true if CT node has unconscious effect, false if not.
+function isActorUnconscious(nodeCT)
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+		local sEffectLabel = DB.getValue(nodeEffect, "label", ""):lower()
+		if sEffectLabel:match("^%s*unconscious%s*$") then return true end
+	end
+
+	return false
+end
+
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
@@ -451,13 +466,13 @@ function isPlayerStealthInfoDisabled()
 	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "none"
 end
 
-function isSecretMessage(rSource)
-	local nodeSourceCT = ActorManager.getCTNode(rSource)
+function isSecretMessage(vActor)
+	local nodeSourceCT = ActorManager.getCTNode(vActor)
 	if not nodeSourceCT then return false end
 
 	return CombatManager.isCTHidden(nodeSourceCT) or 	-- never show for hidden actors
 		   not checkVisibilityAll() or 					-- show if visibility is set to Chat and Effects (all)
-		   (isNpc(rSource) and not isFriend(rSource)) 	-- show npcs only if they are friends
+		   (isNpc(vActor) and not isFriend(vActor)) 	-- show npcs only if they are friends
 
 end
 
@@ -606,12 +621,19 @@ end
 
 -- This function is one that the Combat Tracker calls if present at the start of a creatures turn.  Wired up in onInit() for the host only.
 function onTurnStartEvent(nodeEntry)
+	-- If the current actor is NPC, add Stealth +0 to their skills if no Stealth skill exists.
+	ensureStealthSkillExistsOnNpc(nodeEntry)
+
+	-- Check to make sure the CT actor is conscious.  Unconscious actors should not be assessed.
+	if isActorUnconscious(nodeEntry) then
+		displayUnconsciousChatMessage(nodeEntry)
+		return
+	end
+
 	-- Do the GM only display of the actors that are hidden to the current actor.
 	checkCTNodeForHiddenActors(nodeEntry)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
 	displayUnawareTargets(nodeEntry)
-	-- If the current actor is NPC, add Stealth +0 to their skills if no Stealth skill exists.
-	ensureStealthSkillExistsOnNpc(nodeEntry)
 end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
@@ -761,22 +783,20 @@ end
 function processHostOnlySubcommands(sSubcommand)
 	-- Default/empty subcommand - What does the current CT actor not perceive?
 	if sSubcommand == "" then
-		-- This is the default subcommand for the host (/st with no subcommand). It will give a local only display of the actors hidden from the active CT actor.
+		-- This is the default subcommand for the host (/stealth with no subcommand). It will give a local only display of the actors hidden from the active CT actor.
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
-		local nCountHidden = checkCTNodeForHiddenActors(nodeActiveCT)
-		local nCountUnaware = displayUnawareTargets(nodeActiveCT)
 		if not nodeActiveCT then
 			displayChatMessage("No active Combat Tracker actor.", true)
-		elseif nCountHidden == 0 and nCountUnaware == 0 then
-			local sActorName = ""
-			local rSource = ActorManager.resolveActor(nodeActiveCT)
-			if rSource then
-				sActorName = ActorManager.getDisplayName(rSource)
+		elseif isActorUnconscious(nodeActiveCT) then
+			displayUnconsciousChatMessage(nodeActiveCT)
+		else
+			local nCountHidden = checkCTNodeForHiddenActors(nodeActiveCT)
+			local nCountUnaware = displayUnawareTargets(nodeActiveCT)
+			if nCountHidden == 0 and nCountUnaware == 0 then
+				local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeActiveCT))
+				displayChatMessage(sText, true)
 			end
-
-			local sText = string.format("No hidden or unaware actors to '%s'.", sActorName)
-			displayChatMessage(sText, true)
 		end
 		return
 	end
