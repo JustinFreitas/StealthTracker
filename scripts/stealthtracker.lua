@@ -77,8 +77,8 @@ function booleanToNumber(bValue)
 end
 
 -- Function to check, for a given CT node, which CT actors are hidden from it.
-function checkCTNodeForHiddenActors(nodeCTSource)
-	if not nodeCTSource then return 0 end
+function checkCTNodeForHiddenActors(nodeCTSource, aOutput)
+	if not nodeCTSource or getActorDebilitatingCondition(nodeCTSource) then return 0 end
 
 	-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
@@ -109,10 +109,15 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	end
 
 	if #aHiddenFromSource > 0 then
-		local sText = string.format("'%s' (PP: %d) does not perceive:\r\r",
+		local sText = string.format("'%s' (PP: %d) does not perceive:\r%s",
 									ActorManager.getDisplayName(nodeCTSource),
-									getPassivePerceptionNumber(rCurrentActor))
-		displayChatMessage(sText .. table.concat(aHiddenFromSource, "\r"), true)
+									getPassivePerceptionNumber(rCurrentActor),
+									table.concat(aHiddenFromSource, "\r"))
+		if not aOutput then
+			displayChatMessage(sText, true)
+		else
+			table.insert(aOutput, sText)
+		end
 	end
 
 	return #aHiddenFromSource
@@ -168,7 +173,7 @@ function displayDebilitatingConditionChatMessage(nodeCT, sCondition)
 end
 
 -- Function to display as a local chat message (not broadcast) the potentially unaware targets of an attacker that is stealthing, which might mean the attacker could take advantage on the roll.
-function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnawareTargets)
+function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnawareTargets, aOutput)
 	if not rSource or not nStealthSource or not aUnawareTargets then return end
 
 	local sSourceName = ActorManager.getDisplayName(rSource)
@@ -188,28 +193,27 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 	end
 
 	local sChatMessage
-	if #aUnawareActorNamesAndPP == 0 then
-		sChatMessage = string.format("'%s' (%s: %d) is hidden from no one.",
-										sSourceName,
-										LOCALIZED_STEALTH_ABV,
-										nStealthSource)
-	else
+	if #aUnawareActorNamesAndPP > 0 then
 		-- Now, let's display a summary message and append the output strings from above appended to the end.
-		sChatMessage = string.format("'%s' (%s: %d) is hidden to:\r\r%s",
+		sChatMessage = string.format("'%s' (%s: %d) is hidden to:\r%s",
 										sSourceName,
 										LOCALIZED_STEALTH_ABV,
 										nStealthSource,
 										table.concat(aUnawareActorNamesAndPP, "\r"))
-	end
 
-	displayChatMessage(sChatMessage, isSecretMessage(rSource))
+		if not aOutput then
+			displayChatMessage(sChatMessage, true)
+		else
+			table.insert(aOutput, sChatMessage)
+		end
+	end
 end
 
 function isDifferentFaction(vSource, vTarget)
 	return ActorManager.getFaction(vSource) ~= ActorManager.getFaction(vTarget)
 end
 
-function displayUnawareTargets(nodeActiveCT)
+function displayUnawareTargets(nodeActiveCT, aOutput)
 	if not nodeActiveCT then return 0 end
 
 	local rSource = ActorManager.resolveActor(nodeActiveCT)
@@ -219,7 +223,7 @@ function displayUnawareTargets(nodeActiveCT)
 	if not nStealthSource then return 0 end
 
 	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
-	displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnawareTargets)
+	displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnawareTargets, aOutput)
 	return #aUnawareTargets
 end
 
@@ -639,10 +643,25 @@ function onTurnStartEvent(nodeEntry)
 		return
 	end
 
+	displayStealthCheckInformation(nodeEntry)
+end
+
+function displayStealthCheckInformation(nodeActorCT)
+	local aOutput = {}
 	-- Do the GM only display of the actors that are hidden to the current actor.
-	checkCTNodeForHiddenActors(nodeEntry)
+	local nCountHidden = checkCTNodeForHiddenActors(nodeActorCT, aOutput)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
-	displayUnawareTargets(nodeEntry)
+	local nCountUnaware = displayUnawareTargets(nodeActorCT, aOutput)
+	if nCountHidden > 0 and nCountUnaware > 0 then
+		table.insert(aOutput, 2, "\r")
+	end
+
+	local nTotal = nCountHidden + nCountUnaware
+	if nTotal > 0 then
+		displayChatMessage(table.concat(aOutput, "\r"), true)
+	end
+
+	return nTotal
 end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
@@ -742,7 +761,7 @@ function processAttackFromStealth(rSource, rTarget)
 				end
 			end
 
-			local sChatMessage = string.format("An attack was made by '%s' that had no target. The following Combat Tracker actors are hidden from '%s', who has a Passive Perception of %d:\r\r%s",
+			local sChatMessage = string.format("An attack was made by '%s' that had no target. The following Combat Tracker actors are hidden from '%s', who has a Passive Perception of %d:\r%s",
 											   ActorManager.getDisplayName(rSource),
 											   ActorManager.getDisplayName(rSource),
 											   nSourcePP,
@@ -796,9 +815,8 @@ function processHostOnlySubcommands(sSubcommand)
 			if sCondition then
 				displayDebilitatingConditionChatMessage(nodeActiveCT, sCondition)
 			else
-				local nCountHidden = checkCTNodeForHiddenActors(nodeActiveCT)
-				local nCountUnaware = displayUnawareTargets(nodeActiveCT)
-				if nCountHidden == 0 and nCountUnaware == 0 then
+				local nTotal = displayStealthCheckInformation(nodeActiveCT)
+				if nTotal == 0 then
 					local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeActiveCT))
 					displayChatMessage(sText, true)
 				end
