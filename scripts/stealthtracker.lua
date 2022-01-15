@@ -439,7 +439,11 @@ end
 function isActorUnconscious(nodeCT)
 	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
 		local sEffectLabel = DB.getValue(nodeEffect, "label", ""):lower()
-		if sEffectLabel:match("^%s*unconscious%s*$") then return true end
+		-- Let's break that effect up into it's components (i.e. tokenize on ;)
+		local aEffectComponents = EffectManager.parseEffect(sEffectLabel)
+		for _, sEffect in pairs(aEffectComponents) do
+			if sEffect:match("^%s*unconscious%s*$") then return true end
+		end
 	end
 
 	return false
