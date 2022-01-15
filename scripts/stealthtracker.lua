@@ -429,24 +429,12 @@ end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
 function hasValidType(nodeCT)
-	if not nodeCT then return false end
-
-	local nodeType = nodeCT.getChild("type")
-	return nodeType and nodeType.getText() ~= ""
+	return nodeCT and ActorManager.getType(nodeCT) ~= ""
 end
 
--- true if CT node has unconscious effect, false if not.
-function isActorUnconscious(nodeCT)
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
-		local sEffectLabel = DB.getValue(nodeEffect, "label", ""):lower()
-		-- Let's break that effect up into it's components (i.e. tokenize on ;)
-		local aEffectComponents = EffectManager.parseEffect(sEffectLabel)
-		for _, sEffect in pairs(aEffectComponents) do
-			if sEffect:match("^%s*unconscious%s*$") then return true end
-		end
-	end
-
-	return false
+function isActorUnconscious(nodeActor)
+	local rActor = ActorManager.resolveActor(nodeActor)
+	return EffectManager5E.hasEffect(rActor, "Unconscious")
 end
 
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
