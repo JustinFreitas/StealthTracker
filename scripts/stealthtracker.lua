@@ -700,8 +700,13 @@ function processAttackFromStealth(rSource, rTarget)
 	end
 
 	-- HOST ONLY PROCESSING STARTS HERE ----------------------------------------------------------------------------------------------------------
+	local sCondition = getActorDebilitatingCondition(nodeSourceCT)
+	if sCondition then
+		displayDebilitatingConditionChatMessage(nodeSourceCT, sCondition)
+		return
+	end
+
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
-	-- When there is no target, report the CT actors that are hidden from the source.
 	if not rTarget then
 		local sNoTarget = "No attack target!"
 		if displayStealthCheckInformation(nodeSourceCT, {sNoTarget}) == 0 then
