@@ -158,8 +158,8 @@ function displayChatMessage(sFormattedText, bSecret)
 	end
 end
 
-function displayUnconsciousChatMessage(nodeCT)
-	local sText = string.format("'%s' is unconscious, skipping StealthTracker processing.", ActorManager.getDisplayName(nodeCT))
+function displayDebilitatingConditionChatMessage(nodeCT, sCondition)
+	local sText = string.format("'%s' is %s, skipping StealthTracker processing.", ActorManager.getDisplayName(nodeCT), sCondition)
 	displayChatMessage(sText, isSecretMessage(nodeCT))
 end
 
@@ -273,6 +273,25 @@ function expireStealthEffectOnCTNode(rActor)
 	if nodeLastEffectWithStealth then
 		EffectManager.expireEffect(nodeCT, nodeLastEffectWithStealth, 0)
 	end
+end
+
+function getActorDebilitatingCondition(nodeActor)
+	local rActor = ActorManager.resolveActor(nodeActor)
+	local aConditions = { -- prioritized
+		"unconscious",
+		"incapacitated",
+		"stunned",
+		"paralyzed",
+		"petrified",
+		"turned", -- FG, not 5e
+		"stable", -- FG, not 5e
+	}
+
+	for _, sCondition in ipairs(aConditions) do
+		if EffectManager5E.hasEffect(rActor, sCondition) then return sCondition end
+	end
+
+	return nil
 end
 
 -- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
@@ -427,11 +446,6 @@ end
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
 function hasValidType(nodeCT)
 	return nodeCT and ActorManager.getType(nodeCT) ~= ""
-end
-
-function isActorUnconscious(nodeActor)
-	local rActor = ActorManager.resolveActor(nodeActor)
-	return EffectManager5E.hasEffect(rActor, "Unconscious")
 end
 
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
@@ -606,8 +620,9 @@ function onTurnStartEvent(nodeEntry)
 	ensureStealthSkillExistsOnNpc(nodeEntry)
 
 	-- Check to make sure the CT actor is conscious.  Unconscious actors should not be assessed.
-	if isActorUnconscious(nodeEntry) then
-		displayUnconsciousChatMessage(nodeEntry)
+	local sCondition = getActorDebilitatingCondition(nodeEntry)
+	if sCondition then
+		displayDebilitatingConditionChatMessage(nodeEntry, sCondition)
 		return
 	end
 
@@ -763,16 +778,20 @@ function processHostOnlySubcommands(sSubcommand)
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then
 			displayChatMessage("No active Combat Tracker actor.", true)
-		elseif isActorUnconscious(nodeActiveCT) then
-			displayUnconsciousChatMessage(nodeActiveCT)
 		else
-			local nCountHidden = checkCTNodeForHiddenActors(nodeActiveCT)
-			local nCountUnaware = displayUnawareTargets(nodeActiveCT)
-			if nCountHidden == 0 and nCountUnaware == 0 then
-				local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeActiveCT))
-				displayChatMessage(sText, true)
+			local sCondition = getActorDebilitatingCondition(nodeActiveCT)
+			if sCondition then
+				displayDebilitatingConditionChatMessage(nodeActiveCT, sCondition)
+			else
+				local nCountHidden = checkCTNodeForHiddenActors(nodeActiveCT)
+				local nCountUnaware = displayUnawareTargets(nodeActiveCT)
+				if nCountHidden == 0 and nCountUnaware == 0 then
+					local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeActiveCT))
+					displayChatMessage(sText, true)
+				end
 			end
 		end
+
 		return
 	end
 
