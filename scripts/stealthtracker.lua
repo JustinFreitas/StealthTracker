@@ -79,17 +79,14 @@ end
 function checkCTNodeForHiddenActors(nodeCTSource)
 	if not nodeCTSource then return 0 end
 
-	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
-	if not rCurrentActor then return 0 end
-
-	-- Get the creature node for the current CT actor.  For PC it's the character sheet node.  For NPC it's CT node.
-	local nodeCreature = ActorManager.getCreatureNode(rCurrentActor)
-	if not nodeCreature then return 0 end
-
 	-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	if not lCombatTrackerActors then return 0 end
 
+	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
+	if not rCurrentActor then return 0 end
+
+	-- TODO: Consolidate this loop into a single displayChatMessage() call.
 	local nCountHidden = 0
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
