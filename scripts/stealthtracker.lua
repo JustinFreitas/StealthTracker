@@ -582,16 +582,13 @@ end
 function onRollSkill(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
 	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll (i.e. "[CHECK] Dexterity").  Allow this for NPC's without a Stealth skill only.
-	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and isStealthSkillRoll(rRoll.sDesc)
-	local nodeCreature
+	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
 	if bProcessStealth then
 		-- For PCs, sCreatureNode is their character sheet node.  For NPCs, it's the CT node (i.e. same as sCTNode).  This is important because when the game loads, the CT node name for PCs is lost... it's reloaded from their character sheet node on initialization.  This isn't the case for NPCs, which retain their modified name on game load.
-		-- Capture the creature node of the actor that made the die roll
-		nodeCreature = ActorManager.getCreatureNode(rSource)
 		-- Check to see if the current actor is a npc and not visible.  If so, make the roll as secret/tower.
-		if nodeCreature and (isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(nodeCreature))) then
+		if isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(rSource)) then
 			rRoll.bSecret = true
 		end
 	end
@@ -629,28 +626,22 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	if not isTargetHiddenFromSource(rSource, rTarget) then
 		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-			sMsgText = string.format(
-										"Attacker is hidden from target. Should attack be at advantage? (Attacker '%s' %s: %d, Target '%s' Passive Perception: %d).",
+			sMsgText = string.format("Attacker is hidden from target. Should attack be at advantage? (Attacker '%s' %s: %d, Target '%s' Passive Perception: %d).",
 										ActorManager.getDisplayName(rSource),
 										LOCALIZED_STEALTH,
 										nStealthSource,
 										ActorManager.getDisplayName(rTarget),
-										getPassivePerceptionNumber(rTarget)
-									)
+										getPassivePerceptionNumber(rTarget))
 		else
 			-- Target sees the attack coming.  Build appropriate message.
-			sMsgText = string.format(
-										"Target sees the attack coming, no advantage from stealth for attacker. (Target '%s' Passive Perception: %d, Attacker '%s' %s: %d)",
+			sMsgText = string.format("Target sees the attack coming, no advantage from stealth for attacker. (Target '%s' Passive Perception: %d, Attacker '%s' %s: %d)",
 										ActorManager.getDisplayName(rTarget),
 										getPassivePerceptionNumber(rTarget),
 										ActorManager.getDisplayName(rSource),
 										LOCALIZED_STEALTH,
-										nStealthSource
-									)
+										nStealthSource)
 		end
-	end
 
-	if sMsgText then
 		displayChatMessage(sMsgText, isSecretMessage(rSource))
 	end
 
