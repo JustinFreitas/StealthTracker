@@ -173,9 +173,15 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 	local aUnawareActorNamesAndPP = {}
 	for _, rActor in ipairs(aUnawareTargets) do
 		if rActor then
+			local sCondition = getActorDebilitatingCondition(rActor)
 			local nPPActor = getPassivePerceptionNumber(rActor)
 			if nPPActor ~= nil then
-				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - Passive Perception: %d", ActorManager.getDisplayName(rActor), getPassivePerceptionNumber(rActor)))
+				local sReason = string.format("PP: %d", nPPActor)
+				if sCondition then
+					sReason = sCondition
+				end
+
+				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - %s", ActorManager.getDisplayName(rActor), sReason))
 			end
 		end
 	end
@@ -275,8 +281,10 @@ function expireStealthEffectOnCTNode(rActor)
 	end
 end
 
-function getActorDebilitatingCondition(nodeActor)
-	local rActor = ActorManager.resolveActor(nodeActor)
+function getActorDebilitatingCondition(vActor)
+	local rActor = ActorManager.resolveActor(vActor)
+	if not rActor then return nil end
+
 	local aConditions = { -- prioritized
 		"unconscious",
 		"incapacitated",
