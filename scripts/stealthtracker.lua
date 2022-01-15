@@ -768,8 +768,7 @@ function processHostOnlySubcommands(sSubcommand)
 			if sCondition then
 				displayDebilitatingConditionChatMessage(nodeActiveCT, sCondition)
 			else
-				local nTotal = displayStealthCheckInformation(nodeActiveCT)
-				if nTotal == 0 then
+				if displayStealthCheckInformation(nodeActiveCT) == 0 then
 					local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeActiveCT))
 					displayChatMessage(sText, true)
 				end
