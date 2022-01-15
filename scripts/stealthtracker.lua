@@ -465,12 +465,9 @@ function isPlayerStealthInfoDisabled()
 end
 
 function isSecretMessage(vActor)
-	local nodeActorCT = ActorManager.getCTNode(vActor)
-	if not nodeActorCT then return false end
-
-	return CombatManager.isCTHidden(nodeActorCT) or 	-- never show for hidden actors
+	return CombatManager.isCTHidden(vActor) or 	-- never show for hidden actors
 		   not checkVisibilityAll() or 					-- show if visibility is set to Chat and Effects (all)
-		   (isNpc(nodeActorCT) and not isFriend(nodeActorCT)) 	-- show npcs only if they are friends
+		   (isNpc(vActor) and not isFriend(vActor)) 	-- show npcs only if they are friends
 
 end
 
