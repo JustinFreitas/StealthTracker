@@ -716,10 +716,9 @@ function processAttackFromStealth(rSource, rTarget)
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	-- When there is no target, report the CT actors that are hidden from the source.
 	if not rTarget then
-		local aOutput = {"No attack target!"}
-		local nTotal = displayStealthCheckInformation(nodeSourceCT, aOutput)
-		if nTotal == 0 then
-			displayChatMessage(aOutput[1], true)
+		local sNoTarget = "No attack target!"
+		if displayStealthCheckInformation(nodeSourceCT, {sNoTarget}) == 0 then
+			displayChatMessage(sNoTarget, true)
 		end
 	else -- if (not rTarget)
 		-- Check to see if the source can perceive the target.
