@@ -13,6 +13,7 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
+LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 -- Global to hold User.isHost()
 USER_ISHOST = false
@@ -86,8 +87,7 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
 	if not rCurrentActor then return 0 end
 
-	-- TODO: Consolidate this loop into a single displayChatMessage() call.
-	local nCountHidden = 0
+	local aHiddenFromSource = {}
 	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
 		local rIterationActor = ActorManager.resolveActor(nodeCT)
@@ -96,22 +96,23 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				-- Finish creating the message (with text and secret flag), then post it to chat.
-				local sText = string.format("'%s' does not perceive '%s' due to being hidden (pp=%d vs %s=%d).",
-											ActorManager.getDisplayName(rHiddenTarget.source),
+				local sText = string.format("'%s' - %s: %d",
 											ActorManager.getDisplayName(rIterationActor),
-											rHiddenTarget.sourcePP,
-											LOCALIZED_STEALTH_LOWER,
+											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth)
-				-- Make the message GM only if this iteration's CT token isn't visible.
-				-- If the actor being checked is a npc and not visible, make the chat entry secret.
-				local bSecret = isSecretMessage(rCurrentActor)
-				displayChatMessage(sText, bSecret)
-				nCountHidden = nCountHidden + 1
+				table.insert(aHiddenFromSource, sText)
 			end
 		end
 	end
 
-	return nCountHidden
+	if #aHiddenFromSource > 0 then
+		local sText = string.format("'%s' (PP: %d) does not perceive:\r\r",
+									ActorManager.getDisplayName(nodeCTSource),
+									getPassivePerceptionNumber(rCurrentActor))
+		displayChatMessage(sText .. table.concat(aHiddenFromSource, "\r"), true)
+	end
+
+	return #aHiddenFromSource
 end
 
 function checkExpireActionAndRound()
@@ -188,15 +189,15 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 
 	local sChatMessage
 	if #aUnawareActorNamesAndPP == 0 then
-		sChatMessage = string.format("'%s' is stealthing (%s: %d) but everyone in the Combat Tracker sees them.",
+		sChatMessage = string.format("'%s' (%s: %d) is hidden from no one.",
 										sSourceName,
-										LOCALIZED_STEALTH,
+										LOCALIZED_STEALTH_ABV,
 										nStealthSource)
 	else
 		-- Now, let's display a summary message and append the output strings from above appended to the end.
-		sChatMessage = string.format("'%s' is stealthing (%s: %d). The following Combat Tracker actors would not see the attack coming and grant advantage:\r\r%s",
+		sChatMessage = string.format("'%s' (%s: %d) is hidden to:\r\r%s",
 										sSourceName,
-										LOCALIZED_STEALTH,
+										LOCALIZED_STEALTH_ABV,
 										nStealthSource,
 										table.concat(aUnawareActorNamesAndPP, "\r"))
 	end
