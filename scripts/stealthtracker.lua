@@ -131,10 +131,6 @@ function checkExpireNone()
 	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "none"
 end
 
-function checkVisibilityAll()
-	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "all"
-end
-
 -- Function that walks the CT nodes and deletes the stealth effects from them.
 function clearAllStealthTrackerDataFromCT()
 	-- Walk the CT resetting all names.
@@ -169,7 +165,25 @@ end
 
 function displayDebilitatingConditionChatMessage(nodeCT, sCondition)
 	local sText = string.format("'%s' is %s, skipping StealthTracker processing.", ActorManager.getDisplayName(nodeCT), sCondition)
-	displayChatMessage(sText, isSecretMessage(nodeCT))
+	displayChatMessage(sText, true)
+end
+
+function displayStealthCheckInformation(nodeActorCT)
+	local aOutput = {}
+	-- Do the GM only display of the actors that are hidden to the current actor.
+	local nCountHidden = checkCTNodeForHiddenActors(nodeActorCT, aOutput)
+	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
+	local nCountUnaware = displayUnawareTargets(nodeActorCT, aOutput)
+	if nCountHidden > 0 and nCountUnaware > 0 then
+		table.insert(aOutput, 2, "\r")
+	end
+
+	local nTotal = nCountHidden + nCountUnaware
+	if nTotal > 0 then
+		displayChatMessage(table.concat(aOutput, "\r"), true)
+	end
+
+	return nTotal
 end
 
 -- Function to display as a local chat message (not broadcast) the potentially unaware targets of an attacker that is stealthing, which might mean the attacker could take advantage on the roll.
@@ -207,10 +221,6 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 			table.insert(aOutput, sChatMessage)
 		end
 	end
-end
-
-function isDifferentFaction(vSource, vTarget)
-	return ActorManager.getFaction(vSource) ~= ActorManager.getFaction(vTarget)
 end
 
 function displayUnawareTargets(nodeActiveCT, aOutput)
@@ -471,6 +481,10 @@ function isDexterityCheckRoll(sRollData)
 	return sRollData and sRollData:lower():match("%[check%] " .. LOCALIZED_DEXTERITY_LOWER)
 end
 
+function isDifferentFaction(vSource, vTarget)
+	return ActorManager.getFaction(vSource) ~= ActorManager.getFaction(vTarget)
+end
+
 -- Function that checks an actor record to see if it's a friend (faction).  Can take an actor record or a node.
 function isFriend(vActor)
 	return vActor and ActorManager.getFaction(vActor) == "friend"
@@ -482,13 +496,6 @@ end
 
 function isPlayerStealthInfoDisabled()
 	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "none"
-end
-
-function isSecretMessage(vActor)
-	return CombatManager.isCTHidden(vActor) or 	-- never show for hidden actors
-		   not checkVisibilityAll() or 					-- show if visibility is set to Chat and Effects (all)
-		   (isNpc(vActor) and not isFriend(vActor)) 	-- show npcs only if they are friends
-
 end
 
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
@@ -646,24 +653,6 @@ function onTurnStartEvent(nodeEntry)
 	displayStealthCheckInformation(nodeEntry)
 end
 
-function displayStealthCheckInformation(nodeActorCT)
-	local aOutput = {}
-	-- Do the GM only display of the actors that are hidden to the current actor.
-	local nCountHidden = checkCTNodeForHiddenActors(nodeActorCT, aOutput)
-	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
-	local nCountUnaware = displayUnawareTargets(nodeActorCT, aOutput)
-	if nCountHidden > 0 and nCountUnaware > 0 then
-		table.insert(aOutput, 2, "\r")
-	end
-
-	local nTotal = nCountHidden + nCountUnaware
-	if nTotal > 0 then
-		displayChatMessage(table.concat(aOutput, "\r"), true)
-	end
-
-	return nTotal
-end
-
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 -- This is called from the host only.
 function performAttackFromStealth(rSource, rTarget, nStealthSource)
@@ -689,7 +678,7 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 										nStealthSource)
 		end
 
-		displayChatMessage(sMsgText, isSecretMessage(rSource))
+		displayChatMessage(sMsgText, true)
 	end
 
 	expireStealthEffectOnCTNode(rSource)
@@ -722,8 +711,6 @@ function processAttackFromStealth(rSource, rTarget)
 
 	-- HOST ONLY PROCESSING STARTS HERE ----------------------------------------------------------------------------------------------------------
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
-	local bSecret = isSecretMessage(rSource)
-
 	-- When there is no target, report the CT actors that are hidden from the source.
 	if not rTarget then
 		local aHiddenTargets = {}
@@ -766,7 +753,7 @@ function processAttackFromStealth(rSource, rTarget)
 											   ActorManager.getDisplayName(rSource),
 											   nSourcePP,
 											   table.concat(aHiddenActorNamesAndStealth, "\r"))
-			displayChatMessage(sChatMessage, bSecret)
+			displayChatMessage(sChatMessage, true)
 		end
 	else -- if (not rTarget)
 		-- Check to see if the source can perceive the target.
@@ -779,7 +766,7 @@ function processAttackFromStealth(rSource, rTarget)
 											rHiddenTarget.stealth,
 											ActorManager.getDisplayName(rSource),
 											rHiddenTarget.sourcePP)
-			displayChatMessage(sMsgText, bSecret)
+			displayChatMessage(sMsgText, true)
 		end
 
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
@@ -897,5 +884,6 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 		nDuration = nEffectDuration,
 		nGMOnly = nEffectGMOnly
 	}
+
 	EffectManager.addEffect("", "", nodeCT, rEffect, true)
 end

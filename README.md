@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.4.5 by Justin Freitas
+StealthTracker v3.5 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -51,5 +51,6 @@ Changelist:
 - v3.4.3 - Various refactoring and improvement in the code, such as utilization of common FG functions to accomplish tasks instead of homegrown logic.
 - v3.4.4 - Fix for camel cased typo in gmatch function call.  Thanks to carrierpl for the report.
 - v3.4.5 - gmatch was a mistake entirely, revert to gsub
+- v3.5 - Don't process stealth on debilitated actors or actors of the same faction as the one being analyzed.  Massive reduction in chat verbosity.  Thanks to Ludd_G for the suggestions and inspiration.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
