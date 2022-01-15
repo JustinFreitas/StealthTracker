@@ -202,9 +202,9 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 			local sCondition = getActorDebilitatingCondition(rActor)
 			local nPPActor = getPassivePerceptionNumber(rActor)
 			if nPPActor ~= nil and not sCondition and isDifferentFaction(rSource, rActor) then
-				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - %s",
+				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - PP: %d",
 																	ActorManager.getDisplayName(rActor),
-																	string.format("PP: %d", nPPActor)))
+																	nPPActor))
 			end
 		end
 	end
@@ -663,22 +663,18 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 
 	local sMsgText
 	if not isTargetHiddenFromSource(rSource, rTarget) then
+		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
+									 ActorManager.getDisplayName(rSource),
+									 LOCALIZED_STEALTH_ABV,
+									 nStealthSource,
+									 ActorManager.getDisplayName(rTarget),
+									 getPassivePerceptionNumber(rTarget))
 		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-			sMsgText = string.format("Attacker is hidden. Attack at advantage? ('%s' %s: %d, '%s' PP: %d).",
-										ActorManager.getDisplayName(rSource),
-										LOCALIZED_STEALTH_ABV,
-										nStealthSource,
-										ActorManager.getDisplayName(rTarget),
-										getPassivePerceptionNumber(rTarget))
+			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
 		else
 			-- Target sees the attack coming.  Build appropriate message.
-			sMsgText = string.format("Attacker not hidden. ('%s' %s: %d, '%s' PP: %d)",
-										ActorManager.getDisplayName(rTarget),
-										getPassivePerceptionNumber(rTarget),
-										ActorManager.getDisplayName(rSource),
-										LOCALIZED_STEALTH_ABV,
-										nStealthSource)
+			sMsgText = string.format("Attacker not hidden. %s", sStats)
 		end
 
 		displayChatMessage(sMsgText, true)
