@@ -176,13 +176,10 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 		if rActor then
 			local sCondition = getActorDebilitatingCondition(rActor)
 			local nPPActor = getPassivePerceptionNumber(rActor)
-			if nPPActor ~= nil then
-				local sReason = string.format("PP: %d", nPPActor)
-				if sCondition then
-					sReason = sCondition
-				end
-
-				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - %s", ActorManager.getDisplayName(rActor), sReason))
+			if nPPActor ~= nil and not sCondition then
+				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - %s",
+																	ActorManager.getDisplayName(rActor),
+																	string.format("PP: %d", nPPActor)))
 			end
 		end
 	end
