@@ -20,14 +20,12 @@ USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	-- Globals: Translations and isHost
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	-- Register StealthTracker Options
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
@@ -35,15 +33,11 @@ function onInit()
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
-		-- Here is where we register the onTurnStartEvent. We can register many of these which is useful. It adds them to a list and iterates through them in the order they were added.
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
-		-- This allows a hook for us to reset all of the CT actor names upon clearing of initiative/combat via CT menu.
 		CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
 		CombatManager.setCustomDrop(onDropEvent)
-		-- Register a handler for the updatestealth OOB message.
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
-		-- Register a handler for the attackfromstealth OOB message.
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
 		-- Register chat commands for host only.
@@ -51,8 +45,6 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	-- On extension init, override the skill, attack (also handles spell attack rolls), and castsave result handlers with ours and call the default when we are done with our work (in the override).
-	-- The potential conflict has been mitigated by a chaining technique where we store the current action handler for use in our overridden handler.
 	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
 	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
@@ -277,7 +269,6 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	end
 end
 
--- Function to expire the last found stealth effect in the CT node's effects table.  An explicit expiration is needed because the built-in expiration only works if the coded effect matches a known roll or action type (i.e. ATK:3 will expire on attack roll).
 function expireStealthEffectOnCTNode(rActor)
 	if not rActor or checkExpireNone() then return end
 
