@@ -92,7 +92,10 @@ function checkCTNodeForHiddenActors(nodeCTSource)
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
 		local rIterationActor = ActorManager.resolveActor(nodeCT)
 		-- Compare the CT node ID (unique) instead of the name to prevent duplicate friendly names causing problems.
-		if isValidCTNode(nodeCT) and rIterationActor and rCurrentActor.sCTNode ~= rIterationActor.sCTNode then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
+		if isValidCTNode(nodeCT) and
+			rIterationActor and
+			rCurrentActor.sCTNode ~= rIterationActor.sCTNode and
+			isDifferentFaction(nodeCTSource, nodeCT) then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				-- Finish creating the message (with text and secret flag), then post it to chat.
@@ -176,7 +179,7 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 		if rActor then
 			local sCondition = getActorDebilitatingCondition(rActor)
 			local nPPActor = getPassivePerceptionNumber(rActor)
-			if nPPActor ~= nil and not sCondition then
+			if nPPActor ~= nil and not sCondition and isDifferentFaction(rSource, rActor) then
 				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - %s",
 																	ActorManager.getDisplayName(rActor),
 																	string.format("PP: %d", nPPActor)))
@@ -200,6 +203,10 @@ function displayUnawareCTTargetsWithFormatting(rSource, nStealthSource, aUnaware
 	end
 
 	displayChatMessage(sChatMessage, isSecretMessage(rSource))
+end
+
+function isDifferentFaction(vSource, vTarget)
+	return ActorManager.getFaction(vSource) ~= ActorManager.getFaction(vTarget)
 end
 
 function displayUnawareTargets(nodeActiveCT)
