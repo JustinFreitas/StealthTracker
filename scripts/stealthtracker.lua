@@ -168,14 +168,17 @@ function displayDebilitatingConditionChatMessage(nodeCT, sCondition)
 	displayChatMessage(sText, true)
 end
 
-function displayStealthCheckInformation(nodeActorCT)
-	local aOutput = {}
+function displayStealthCheckInformation(nodeActorCT, aOutput)
+	if not aOutput or type(aOutput) ~= "table" then
+		aOutput = {}
+	end
+
 	-- Do the GM only display of the actors that are hidden to the current actor.
 	local nCountHidden = checkCTNodeForHiddenActors(nodeActorCT, aOutput)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
 	local nCountUnaware = displayUnawareTargets(nodeActorCT, aOutput)
 	if nCountHidden > 0 and nCountUnaware > 0 then
-		table.insert(aOutput, 2, "\r")
+		table.insert(aOutput, #aOutput, "\r")
 	end
 
 	local nTotal = nCountHidden + nCountUnaware
@@ -662,19 +665,19 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	if not isTargetHiddenFromSource(rSource, rTarget) then
 		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-			sMsgText = string.format("Attacker is hidden from target. Should attack be at advantage? (Attacker '%s' %s: %d, Target '%s' Passive Perception: %d).",
+			sMsgText = string.format("Attacker is hidden. Attack at advantage? ('%s' %s: %d, '%s' PP: %d).",
 										ActorManager.getDisplayName(rSource),
-										LOCALIZED_STEALTH,
+										LOCALIZED_STEALTH_ABV,
 										nStealthSource,
 										ActorManager.getDisplayName(rTarget),
 										getPassivePerceptionNumber(rTarget))
 		else
 			-- Target sees the attack coming.  Build appropriate message.
-			sMsgText = string.format("Target sees the attack coming, no advantage from stealth for attacker. (Target '%s' Passive Perception: %d, Attacker '%s' %s: %d)",
+			sMsgText = string.format("Attacker not hidden. ('%s' %s: %d, '%s' PP: %d)",
 										ActorManager.getDisplayName(rTarget),
 										getPassivePerceptionNumber(rTarget),
 										ActorManager.getDisplayName(rSource),
-										LOCALIZED_STEALTH,
+										LOCALIZED_STEALTH_ABV,
 										nStealthSource)
 		end
 
@@ -713,56 +716,19 @@ function processAttackFromStealth(rSource, rTarget)
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	-- When there is no target, report the CT actors that are hidden from the source.
 	if not rTarget then
-		local aHiddenTargets = {}
-		-- For each actor in the combat tracker, check to see if it is a viable target.
-		-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
-		local lCombatTrackerActors = CombatManager.getSortedCombatantList()
-		if not lCombatTrackerActors then return end
-
-		-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
-		for _, nodeCT in ipairs(lCombatTrackerActors) do
-			local rActor = ActorManager.resolveActor(nodeCT)
-			if rActor and rSource.sCTNode ~= rActor.sCTNode then
-				local rHiddenTarget = isTargetHiddenFromSource(rSource, rActor)
-				if rHiddenTarget then
-					-- table.insert() will insert rActor into the table using the default integer 1's based key.
-					table.insert(aHiddenTargets, rHiddenTarget)
-				end
-			end
-		end
-
-		-- If hidden targets were found, report on that fact in the chat.
-		if #aHiddenTargets > 0 then
-			--Build a table of hidden targets with their stealth values so that all of the results can be displayed in a single message instead of multiple.
-			local aHiddenActorNamesAndStealth = {}
-			local nSourcePP
-			for _, rHiddenTarget in ipairs(aHiddenTargets) do
-				local output = string.format("'%s' - %s: %d",
-												ActorManager.getDisplayName(rHiddenTarget.target),
-												LOCALIZED_STEALTH,
-												rHiddenTarget.stealth)
-				table.insert(aHiddenActorNamesAndStealth, output)
-				-- Only populate the nSourcePP once for use in the format msg (not is true only for nil & false... zero doesn't apply).
-				if not nSourcePP then
-					nSourcePP = rHiddenTarget.sourcePP
-				end
-			end
-
-			local sChatMessage = string.format("An attack was made by '%s' that had no target. The following Combat Tracker actors are hidden from '%s', who has a Passive Perception of %d:\r%s",
-											   ActorManager.getDisplayName(rSource),
-											   ActorManager.getDisplayName(rSource),
-											   nSourcePP,
-											   table.concat(aHiddenActorNamesAndStealth, "\r"))
-			displayChatMessage(sChatMessage, true)
+		local aOutput = {"No attack target!"}
+		local nTotal = displayStealthCheckInformation(nodeSourceCT, aOutput)
+		if nTotal == 0 then
+			displayChatMessage(aOutput[1], true)
 		end
 	else -- if (not rTarget)
 		-- Check to see if the source can perceive the target.
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
 			-- Warn the chat that the target might be hidden
-			local sMsgText = string.format("Target hidden from attacker. Should attack be possible? ('%s' %s: %d, '%s' Passive Perception: %d).",
+			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
 											ActorManager.getDisplayName(rTarget),
-											LOCALIZED_STEALTH,
+											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
 											ActorManager.getDisplayName(rSource),
 											rHiddenTarget.sourcePP)
