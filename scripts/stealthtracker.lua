@@ -452,14 +452,12 @@ function isDexterityCheckRoll(sRollData)
 end
 
 -- Function that checks an actor record to see if it's a friend (faction).  Can take an actor record or a node.
-function isFriend(rActor)
-	return rActor and ActorManager.getFaction(rActor) == "friend"
+function isFriend(vActor)
+	return vActor and ActorManager.getFaction(vActor) == "friend"
 end
 
--- Function that check an actor record (i.e. from ActorManager.resolveActor(nodeCT)) to see if it's an npc.
-function isNpc(rActor)
-	if not rActor then return false end
-	return rActor.sType == "npc"
+function isNpc(vActor)
+	return vActor and ActorManager.getType(vActor) == "npc"
 end
 
 function isPlayerStealthInfoDisabled()
@@ -467,12 +465,12 @@ function isPlayerStealthInfoDisabled()
 end
 
 function isSecretMessage(vActor)
-	local nodeSourceCT = ActorManager.getCTNode(vActor)
-	if not nodeSourceCT then return false end
+	local nodeActorCT = ActorManager.getCTNode(vActor)
+	if not nodeActorCT then return false end
 
-	return CombatManager.isCTHidden(nodeSourceCT) or 	-- never show for hidden actors
+	return CombatManager.isCTHidden(nodeActorCT) or 	-- never show for hidden actors
 		   not checkVisibilityAll() or 					-- show if visibility is set to Chat and Effects (all)
-		   (isNpc(vActor) and not isFriend(vActor)) 	-- show npcs only if they are friends
+		   (isNpc(nodeActorCT) and not isFriend(nodeActorCT)) 	-- show npcs only if they are friends
 
 end
 
