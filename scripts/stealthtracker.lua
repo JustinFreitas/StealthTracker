@@ -155,8 +155,8 @@ function displayChatMessage(sFormattedText, bSecret)
 	end
 end
 
-function displayDebilitatingConditionChatMessage(nodeCT, sCondition)
-	local sText = string.format("'%s' is %s, skipping StealthTracker processing.", ActorManager.getDisplayName(nodeCT), sCondition)
+function displayDebilitatingConditionChatMessage(vActor, sCondition)
+	local sText = string.format("'%s' is %s, skipping StealthTracker processing.", ActorManager.getDisplayName(vActor), sCondition)
 	displayChatMessage(sText, true)
 end
 
@@ -606,6 +606,7 @@ end
 function onRollCastSave(rSource, rTarget, rRoll)
 	ActionPower.onCastSaveStealthTracker(rSource, rTarget, rRoll)
 	-- TODO: Check attack possible due to sight?  Will require a processCastSaveFromStealth(), notifyCastSaveFromStealth(), and handleCastSaveFromStealth().
+	-- TODO: This needs to be changed into a message that is handled on the host to assess debilitating condition and also expire the effect.
 	expireStealthEffectOnCTNode(rSource)
 end
 
