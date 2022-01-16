@@ -9,6 +9,7 @@
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 -- Global message type to allow the client to attack from stealth on the host.
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
+OOB_MSGTYPE_CASTSAVEFROMSTEALTH = "castsavefromstealth"
 -- Declare a global to hold the localized stealth string, initialized for locale in onInit()
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
@@ -438,15 +439,20 @@ end
 function handleAttackFromStealth(msgOOB)
 	if not msgOOB or not msgOOB.type then return end
 
+	local bAttackFromStealth
 	if msgOOB.type == OOB_MSGTYPE_ATTACKFROMSTEALTH then
-		if not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
-
-		local rSource = ActorManager.resolveActor(msgOOB.sSourceCTNode)
-		if not rSource then return end
-
-		local rTarget = ActorManager.resolveActor(msgOOB.sTargetCTNode)
-		processAttackFromStealth(rSource, rTarget)
+		bAttackFromStealth = true
+	else
+		bAttackFromStealth = false
 	end
+
+	if not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
+
+	local rSource = ActorManager.resolveActor(msgOOB.sSourceCTNode)
+	if not rSource then return end
+
+	local rTarget = ActorManager.resolveActor(msgOOB.sTargetCTNode)
+	processAttackFromStealth(rSource, rTarget, bAttackFromStealth)
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
@@ -528,12 +534,16 @@ function isValidCTNode(nodeCT)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
-function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
+function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode, bAttackFromStealth)
 	if not sSourceCTNode or not sTargetCTNode then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
-	msgOOB.type = OOB_MSGTYPE_ATTACKFROMSTEALTH
+	if bAttackFromStealth then
+		msgOOB.type = OOB_MSGTYPE_ATTACKFROMSTEALTH
+	else
+		msgOOB.type = OOB_MSGTYPE_CASTSAVEFROMSTEALTH
+	end
 
 	-- Capturing the username allows for the effect to be built so that it can be deleted by the client.
 	msgOOB.sSourceCTNode = sSourceCTNode
@@ -594,17 +604,27 @@ end
 -- Attack roll handler
 function onRollAttack(rSource, rTarget, rRoll)
 	-- When attacks are rolled in the tower, the target is always nil.
-	if not rTarget and rRoll.bSecret then
-		displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", USER_ISHOST)
+	if not rTarget and rRoll and rRoll.bSecret then
+		displayTowerRoll("An attack", "Attacks")
 	end
 
 	-- Call the stored (during initialization in onInit()) attack roll handler.
 	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
-	processAttackFromStealth(rSource, rTarget)
+	processAttackFromStealth(rSource, rTarget, true)
+end
+
+function displayTowerRoll(sAnAction, sActions)
+	displayChatMessage(string.format("%s was rolled in the tower.  %s should be rolled in the open for proper StealthTracker processing.", sAnAction, sActions), USER_ISHOST)
 end
 
 function onRollCastSave(rSource, rTarget, rRoll)
+	-- When casts are rolled in the tower, the target is always nil.
+	if not rTarget and rRoll and rRoll.bSecret then
+		displayTowerRoll("A cast save", "Cast saves")
+	end
+
 	ActionPower.onCastSaveStealthTracker(rSource, rTarget, rRoll)
+	processAttackFromStealth(rSource, rTarget, false)
 	-- TODO: Check attack possible due to sight?  Will require a processCastSaveFromStealth(), notifyCastSaveFromStealth(), and handleCastSaveFromStealth().
 	-- TODO: This needs to be changed into a message that is handled on the host to assess debilitating condition and also expire the effect.
 	expireStealthEffectOnCTNode(rSource)
@@ -650,11 +670,11 @@ end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 -- This is called from the host only.
-function performAttackFromStealth(rSource, rTarget, nStealthSource)
+function performAttackFromStealth(rSource, rTarget, nStealthSource, bAttackFromStealth)
 	if not rSource or not rTarget or not nStealthSource then return end
 
 	local sMsgText
-	if not isTargetHiddenFromSource(rSource, rTarget) then
+	if bAttackFromStealth and not isTargetHiddenFromSource(rSource, rTarget) then
 		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
@@ -676,7 +696,7 @@ function performAttackFromStealth(rSource, rTarget, nStealthSource)
 end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
-function processAttackFromStealth(rSource, rTarget)
+function processAttackFromStealth(rSource, rTarget, bAttackFromStealth)
 	-- If the source is nil but rTarget is present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
 	if not rSource and USER_ISHOST then
 		local nodeActiveCT = CombatManager.getActiveCT()
@@ -696,7 +716,7 @@ function processAttackFromStealth(rSource, rTarget)
 	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 	if not USER_ISHOST then
 		-- We'll have to marshall the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
-		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "")
+		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "", bAttackFromStealth)
 		return
 	end
 
@@ -709,7 +729,7 @@ function processAttackFromStealth(rSource, rTarget)
 
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
-		local sNoTarget = "No attack target!"
+		local sNoTarget = "No action target!"
 		if displayStealthCheckInformation(nodeSourceCT, {sNoTarget}) == 0 then
 			displayChatMessage(sNoTarget, true)
 		end
@@ -718,7 +738,7 @@ function processAttackFromStealth(rSource, rTarget)
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
 			-- Warn the chat that the target might be hidden
-			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
+			local sMsgText = string.format("Target hidden. Action possible? ('%s' %s: %d, '%s' PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
@@ -729,7 +749,7 @@ function processAttackFromStealth(rSource, rTarget)
 
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
 		if nStealthSource then
-			performAttackFromStealth(rSource, rTarget, nStealthSource)
+			performAttackFromStealth(rSource, rTarget, nStealthSource, bAttackFromStealth)
 		end
 	end -- else
 
