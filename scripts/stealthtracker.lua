@@ -734,7 +734,7 @@ function processActionFromStealth(rSource, rTarget, bAttackFromStealth)
 		if rHiddenTarget then
 			-- Warn the chat that the target might be hidden
 			local sMsgText = string.format("Target hidden. %s possible? ('%s' %s: %d, '%s' PP: %d).",
-											ternary(bAttackFromStealth, "Attack", "Cast")
+											ternary(bAttackFromStealth, "Attack", "Cast"),
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
