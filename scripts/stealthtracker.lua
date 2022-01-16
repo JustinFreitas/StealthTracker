@@ -23,9 +23,12 @@ function onInit()
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
+	LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
+	OptionsManager.registerOption2("STEALTHTRACKER_ALLOW_OUT_OF", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
+		{ baselabel = "option_val_none", baseval = "none", labels = "option_val_turn|option_val_turn_and_combat", values = "turn|all", default = "none" })
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
@@ -68,6 +71,15 @@ end
 -- Converts a boolean into a number.
 function booleanToNumber(bValue)
 	return bValue == true and 1 or bValue == false and 0
+end
+
+function checkAllowOutOfCombat()
+	return OptionsManager.getOption("STEALTHTRACKER_ALLOW_OUT_OF") == "all"
+end
+
+function checkAllowOutOfTurn()
+	return OptionsManager.getOption("STEALTHTRACKER_ALLOW_OUT_OF") == "turn" or
+		   checkAllowOutOfCombat()
 end
 
 -- Function to check, for a given CT node, which CT actors are hidden from it.
@@ -131,6 +143,8 @@ end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
 function clearAllStealthTrackerDataFromCT()
+	if checkAllowOutOfCombat() then return end
+
 	-- Walk the CT resetting all names.
 	for _, nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
 		deleteAllStealthEffects(nodeCT)
@@ -275,6 +289,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	end
 end
 
+-- TODO: This needs to support an aOutput object to override the display.
 function expireStealthEffectOnCTNode(rActor)
 	if not rActor then return end
 
@@ -455,17 +470,35 @@ end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
 function handleUpdateStealth(msgOOB)
-	if not msgOOB or not msgOOB.type then return end
+	if not msgOOB or not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
 
-	if msgOOB.type == OOB_MSGTYPE_UPDATESTEALTH then
-		if not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
+	-- Get the node for the current CT actor.
+	local nodeActiveCT = CombatManager.getActiveCT()
+	local sDisabledTextFormat = "Stealth processing disabled when out of %s.  Drag result to CT actor to apply."
 
-		-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
-		local nStealthTotal = tonumber(msgOOB.nStealthTotal)
-		if not nStealthTotal then return end
+	-- If there was no active CT actor/node, forgo StealthTracker processing.
+	if not nodeActiveCT and not checkAllowOutOfCombat() then
+		if checkVerbose() then
+			displayChatMessage(string.format(sDisabledTextFormat, "combat"), true)
+		end
 
-		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
+		return
 	end
+
+	local nodeCT = ActorManager.getCTNode(msgOOB.sCTNodeId)
+	if nodeActiveCT ~= nodeCT and not checkAllowOutOfTurn() then
+		if checkVerbose() then
+			displayChatMessage(string.format(sDisabledTextFormat, "turn"), true)
+		end
+
+		return
+	end
+
+	-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
+	local nStealthTotal = tonumber(msgOOB.nStealthTotal)
+	if not nStealthTotal then return end
+
+	setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
 end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
@@ -578,7 +611,7 @@ function onDropEvent(rSource, rTarget, draginfo)
 	local sDragInfoData = draginfo.getStringData()
 	if not sDragInfoData or sDragInfoData == "" then return true end
 
-	-- If the dropped item was a stealth roll, update the target creature node with the stealth value.
+	-- If the dropped item was a stealth roll or dex check, update the target creature node with the stealth value.
 	local nStealthValue = draginfo.getNumberData()
 	if nStealthValue and (isStealthSkillRoll(sDragInfoData) or isDexterityCheckRoll(sDragInfoData)) then
 		setNodeWithStealthValue(rTarget.sCTNode, nStealthValue)
@@ -591,7 +624,7 @@ end
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
 	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == "genactroll" and rRoll.sGenericAction == "Hide" then
-		ActionsManager2.decodeAdvantage(rRoll)
+		ActionsManager2.decodeAdvantage(rRoll) -- this is done automatically for ruleset (i.e. Stealth) rolls
 		processStealth(rSource, rRoll)
 	end
 end
@@ -628,11 +661,13 @@ end
 function onRollSkill(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
 	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll (i.e. "[CHECK] Dexterity").  Allow this for NPC's without a Stealth skill only.
-	local bProcessStealth = rSource and rSource.sCTNode and rSource.sType and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
+	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
 	if bProcessStealth then
-		-- For PCs, sCreatureNode is their character sheet node.  For NPCs, it's the CT node (i.e. same as sCTNode).  This is important because when the game loads, the CT node name for PCs is lost... it's reloaded from their character sheet node on initialization.  This isn't the case for NPCs, which retain their modified name on game load.
+		-- For PCs, sCreatureNode is their character sheet node.  For NPCs, it's the CT node (i.e. same as sCTNode).
+		-- This is important because when the game loads, the CT node name for PCs is lost... it's reloaded from their character sheet node on initialization.
+		-- This isn't the case for NPCs, which retain their modified name on game load.
 		-- Check to see if the current actor is a npc and not visible.  If so, make the roll as secret/tower.
 		if isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(rSource)) then
 			rRoll.bSecret = true
@@ -663,11 +698,11 @@ end
 
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 -- This is called from the host only.
-function performAttackFromStealth(rSource, rTarget, nStealthSource, bAttackFromStealth)
+function performAttackFromStealth(rSource, rTarget, nStealthSource)
 	if not rSource or not rTarget or not nStealthSource then return end
 
 	local sMsgText
-	if bAttackFromStealth and not isTargetHiddenFromSource(rSource, rTarget) then
+	if not isTargetHiddenFromSource(rSource, rTarget) then
 		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
@@ -728,7 +763,7 @@ function processActionFromStealth(rSource, rTarget, bAttackFromStealth)
 		if displayStealthCheckInformation(nodeSourceCT, {sNoTarget}) == 0 then
 			displayChatMessage(sNoTarget, true)
 		end
-	else -- if (not rTarget)
+	else
 		-- Check to see if the source can perceive the target.
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
@@ -744,10 +779,10 @@ function processActionFromStealth(rSource, rTarget, bAttackFromStealth)
 		end
 
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
-		if nStealthSource then
-			performAttackFromStealth(rSource, rTarget, nStealthSource, bAttackFromStealth)
+		if nStealthSource and bAttackFromStealth then -- not necessary for castsave
+			performAttackFromStealth(rSource, rTarget, nStealthSource)
 		end
-	end -- else
+	end
 
 	-- Expire their stealth effect.
 	expireStealthEffectOnCTNode(rSource)
@@ -800,23 +835,16 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function processStealth(rSource, rRoll)
-	local nodeCT = ActorManager.getCTNode(rSource)
-	if not nodeCT then return end
-
-	-- Get the node for the current CT actor.
-	local nodeActiveCT = CombatManager.getActiveCT()
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
-	if not nodeActiveCT then return end
-
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) and (USER_ISHOST or nodeCT == nodeActiveCT) then
-		-- Calculate the stealth roll so that it's available to put in the creature effects.
+	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
+		-- Calculate the stealth roll so that it's available to put in the creature effects.  Advantage already decoded when coming from a 5E ruleset Stealth roll.
 		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if USER_ISHOST then
-			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.  The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
+			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
+			-- The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
 			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
-		elseif isPlayerStealthInfoDisabled() then
+		elseif isPlayerStealthInfoDisabled() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
 			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
 			displayChatMessage(output, false)
 		else

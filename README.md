@@ -51,6 +51,6 @@ Changelist:
 - v3.4.3 - Various refactoring and improvement in the code, such as utilization of common FG functions to accomplish tasks instead of homegrown logic.
 - v3.4.4 - Fix for camel cased typo in gmatch function call.  Thanks to carrierpl for the report.
 - v3.4.5 - gmatch was a mistake entirely, revert to gsub
-- v3.5 - Bug fix for incorrect stat reporting in attack from stealth scenario.  Don't process stealth on debilitated actors or actors of the same faction as the one being analyzed.  Massive reduction in chat verbosity.  Thanks to Ludd_G for the suggestions and inspiration.
+- v3.5 - Bug fix for incorrect stat reporting in attack from stealth scenario.  Don't process stealth on debilitated actors or actors of the same faction as the one being analyzed.  Massive reduction in chat verbosity. New option for verbose output that's mostly for clarifying information when no output is actually necessary (defaults to off). Thanks to Ludd_G for the suggestions and inspiration.  Wiring of castsave through the messaging mechanism and refactor attack and castsave to reduce duplication.  
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
