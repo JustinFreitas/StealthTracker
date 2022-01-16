@@ -724,7 +724,7 @@ function processActionFromStealth(rSource, rTarget, bAttackFromStealth)
 
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
-		local sNoTarget = "No action target!"
+		local sNoTarget = string.format("No %s target!", ternary(bAttackFromStealth, "attack", "cast save"))
 		if displayStealthCheckInformation(nodeSourceCT, {sNoTarget}) == 0 then
 			displayChatMessage(sNoTarget, true)
 		end
@@ -733,7 +733,8 @@ function processActionFromStealth(rSource, rTarget, bAttackFromStealth)
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
 			-- Warn the chat that the target might be hidden
-			local sMsgText = string.format("Target hidden. Action possible? ('%s' %s: %d, '%s' PP: %d).",
+			local sMsgText = string.format("Target hidden. %s possible? ('%s' %s: %d, '%s' PP: %d).",
+											ternary(bAttackFromStealth, "Attack", "Cast")
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
