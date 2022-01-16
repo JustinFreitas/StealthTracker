@@ -7,9 +7,8 @@
 
 -- Global message type to allow the client to update a npc record on the host.
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
--- Global message type to allow the client to attack from stealth on the host.
-OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
-OOB_MSGTYPE_CASTSAVEFROMSTEALTH = "castsavefromstealth"
+-- Global message type to allow the client to take an action from stealth on the host.
+OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
 -- Declare a global to hold the localized stealth string, initialized for locale in onInit()
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
@@ -41,8 +40,7 @@ function onInit()
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
 		CombatManager.setCustomDrop(onDropEvent)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
-		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
-		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_CASTSAVEFROMSTEALTH, handleAttackFromStealth)
+		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ACTIONFROMSTEALTH, handleActionFromStealth)
 
 		-- Register chat commands for host only.
 		Comm.registerSlashHandler("stealth", processChatCommand)
@@ -449,23 +447,10 @@ function getUnawareCTTargetsGivenSource(rSource)
 end
 
 -- Handler for the message to do an attack from a position of stealth.
-function handleAttackFromStealth(msgOOB)
-	if not msgOOB or not msgOOB.type then return end
-
-	local bAttackFromStealth
-	if msgOOB.type == OOB_MSGTYPE_ATTACKFROMSTEALTH then
-		bAttackFromStealth = true
-	else
-		bAttackFromStealth = false
-	end
-
-	if not msgOOB.sSourceCTNode or not msgOOB.sTargetCTNode then return end
-
-	local rSource = ActorManager.resolveActor(msgOOB.sSourceCTNode)
-	if not rSource then return end
-
-	local rTarget = ActorManager.resolveActor(msgOOB.sTargetCTNode)
-	processActionFromStealth(rSource, rTarget, bAttackFromStealth)
+function handleActionFromStealth(msgOOB)
+	processActionFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode),
+							 ActorManager.resolveActor(msgOOB.sTargetCTNode),
+							 msgOOB.bAttackFromStealth)
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
@@ -552,11 +537,8 @@ function notifyActionFromStealth(sSourceCTNode, sTargetCTNode, bAttackFromStealt
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
-	if bAttackFromStealth then
-		msgOOB.type = OOB_MSGTYPE_ATTACKFROMSTEALTH
-	else
-		msgOOB.type = OOB_MSGTYPE_CASTSAVEFROMSTEALTH
-	end
+	msgOOB.type = OOB_MSGTYPE_ACTIONFROMSTEALTH
+	msgOOB.bAttackFromStealth = bAttackFromStealth
 
 	-- Capturing the username allows for the effect to be built so that it can be deleted by the client.
 	msgOOB.sSourceCTNode = sSourceCTNode
@@ -636,16 +618,8 @@ function onRollAction(rSource, rTarget, rRoll)
 end
 
 function displayTowerRoll(bAttackFromStealth)
-	local sAnAction
-	local sActions
-	if bAttackFromStealth then
-		sAnAction = "An attack"
-		sActions = "Attacks"
-	else
-		sAnAction = "A cast save"
-		sActions = "Cast saves"
-	end
-
+	local sAnAction = ternary(bAttackFromStealth, "An attack", "A cast save")
+	local sActions = ternary(bAttackFromStealth, "Attacks", "Cast saves")
 	displayChatMessage(string.format("%s was rolled in the tower.  %s should be rolled in the open for proper StealthTracker processing.", sAnAction, sActions), USER_ISHOST)
 end
 
@@ -884,4 +858,9 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	}
 
 	EffectManager.addEffect("", "", nodeCT, rEffect, true)
+end
+
+-- Function to serve as a ternary operator (i.e. cond ? T : F)
+function ternary(cond, T, F)
+	if cond then return T else return F end
 end
