@@ -51,9 +51,6 @@ function onInit()
 	ActionAttack.onAttackStealthTracker = ActionAttack.onAttack
 	ActionAttack.onAttack = onRollAttack
 	ActionsManager.registerResultHandler("attack", onRollAttack)
-	ActionPower.onCastSaveStealthTracker = ActionPower.onCastSave
-	ActionPower.onCastSave = onRollCastSave
-	ActionsManager.registerResultHandler("castsave", onRollCastSave)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
 	if ActionGeneral then
@@ -601,13 +598,6 @@ function onRollAttack(rSource, rTarget, rRoll)
 	-- Call the stored (during initialization in onInit()) attack roll handler.
 	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
 	processAttackFromStealth(rSource, rTarget)
-end
-
-function onRollCastSave(rSource, rTarget, rRoll)
-	ActionPower.onCastSaveStealthTracker(rSource, rTarget, rRoll)
-	-- TODO: Check attack possible due to sight?  Will require a processCastSaveFromStealth(), notifyCastSaveFromStealth(), and handleCastSaveFromStealth().
-	-- TODO: This needs to be changed into a message that is handled on the host to assess debilitating condition and also expire the effect.
-	expireStealthEffectOnCTNode(rSource)
 end
 
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
