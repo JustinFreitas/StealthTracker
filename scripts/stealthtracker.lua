@@ -28,6 +28,7 @@ function onInit()
 		{ baselabel = "option_val_none", baseval = "none", labels = "option_val_turn|option_val_turn_and_combat", values = "turn|all", default = "none" })
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
+	-- TODO: What's up with player chat visibility now?  Should we allow it for anything or remove the option?
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VERBOSE", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
@@ -367,7 +368,7 @@ function getActorDebilitatingCondition(vActor)
 end
 
 function getDefaultPassivePerception(nodeCreature)
-	-- TODO: Include the Stealth proficiency for NPCs for this calculation (see manager_action_skill.lua).
+	-- TODO: Include the Stealth proficiency for NPCs (PC is already accounted for) for this calculation (see manager_action_skill.lua).
 	return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom")
 end
 
@@ -820,7 +821,6 @@ end
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
 	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
-	-- TODO: Override the onRollCheck() handler to account for the possibility of a Dex check being used as a stealth roll (i.e. "[CHECK] Dexterity").  Allow this for NPC's without a Stealth skill only.
 	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
