@@ -28,7 +28,9 @@ function onInit()
 		{ baselabel = "option_val_none", baseval = "none", labels = "option_val_turn|option_val_turn_and_combat", values = "turn|all", default = "none" })
 	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
-	-- TODO: What's up with player chat visibility now?  Should we allow it for anything or remove the option?
+	OptionsManager.registerOption2("STEALTHTRACKER_FACTION_FILTER", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
+		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" });
+	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
 	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
 	OptionsManager.registerOption2("STEALTHTRACKER_VERBOSE", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
@@ -114,6 +116,10 @@ end
 
 function checkExpireNone()
 	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "none"
+end
+
+function checkFactionFilter()
+	return OptionsManager.getOption("STEALTHTRACKER_FACTION_FILTER") == "on"
 end
 
 function checkVerbose()
@@ -213,6 +219,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 	end
 end
 
+-- This function executes on clients.
 function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
 	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
@@ -221,7 +228,6 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
-			-- The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
 			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
 				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
 			end
@@ -384,7 +390,7 @@ function getFormattedActorsHiddenFromSource(nodeCTSource, aOutput)
 		if isValidCTNode(nodeCT) and
 			rIterationActor and
 			rCurrentActor.sCTNode ~= rIterationActor.sCTNode and
-			isDifferentFaction(nodeCTSource, nodeCT) then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
+			(checkFactionFilter() and isDifferentFaction(nodeCTSource, nodeCT)) then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
 			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
 			if rHiddenTarget then
 				local sText = string.format("'%s' - %s: %d",
@@ -425,7 +431,9 @@ function getFormattedActorsUnawareOfSource(rSource, nStealthSource, aUnawareTarg
 		if rActor then
 			local sCondition = getActorDebilitatingCondition(rActor)
 			local nPPActor = getPassivePerceptionNumber(rActor)
-			if nPPActor ~= nil and not sCondition and isDifferentFaction(rSource, rActor) then
+			if nPPActor ~= nil and
+			   not sCondition and
+			   (checkFactionFilter() and isDifferentFaction(rSource, rActor)) then
 				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - PP: %d",
 																	ActorManager.getDisplayName(rActor),
 																	nPPActor))

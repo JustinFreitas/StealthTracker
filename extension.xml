@@ -17,6 +17,7 @@
 		<string name="option_header_stealthtracker">StealthTracker (GM)</string>
 		<string name="option_label_STEALTHTRACKER_ALLOW_OUT_OF">Player: Out of turn or combat stealth</string>
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire Stealth effect</string>
+		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Filter same faction</string>
 		<string name="option_label_STEALTHTRACKER_VISIBILITY">Player: Show Stealth info</string>
 		<string name="option_label_STEALTHTRACKER_VERBOSE">Chat: Verbose mode</string>
 		<string name="option_val_action">Action</string>
