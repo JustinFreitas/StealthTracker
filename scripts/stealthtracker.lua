@@ -160,10 +160,8 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 	local nodeSourceCT = ActorManager.getCTNode(rSource)
 	if not nodeSourceCT then return end
 
-	-- This works on the client side even though the effect isn't visible.  Should probably do this on the host
-	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 	if not USER_ISHOST then
-		-- We'll have to marshall the attack from clients via OOB message because the client doesn't have access to the target information here (throws console error for nil/nPP)
+		-- For clients notify of an action from stealth and then exit.  Host handler will pick up message and run code after this block.
 		notifyActionFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "", bAttackFromStealth)
 		return
 	end
@@ -201,6 +199,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 			table.insert(aOutput, sMsgText)
 		end
 
+		local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
 		if nStealthSource and bAttackFromStealth then -- not necessary for castsave
 			getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
@@ -510,7 +509,7 @@ function getFormattedStealthCheckInformation(nodeActorCT, aOutput)
 	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
 	local nCountUnaware = getFormattedUnawareTargets(nodeActorCT, aOutput)
 	if nCountHidden > 0 and nCountUnaware > 0 then
-		table.insert(aOutput, #aOutput, "\r")
+		table.insert(aOutput, #aOutput, "")
 	end
 
 	return nCountHidden + nCountUnaware
