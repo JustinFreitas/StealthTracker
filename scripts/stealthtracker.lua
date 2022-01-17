@@ -556,7 +556,7 @@ function getPassivePerceptionNumber(rActor)
 
 	-- The perception is calculated from different sheets for pc vs npc.
 	local nPP
-	if rActor.sType == "charsheet" then
+	if ActorManager.isPC(rActor) then
 		-- For a PC it's the perception child node.
 		-- The perception value is always populated and always a number type.
 		nPP = DB.getValue(nodeCreature, "perception")
