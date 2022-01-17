@@ -79,6 +79,22 @@ function checkAllowOutOfTurn()
 		   checkAllowOutOfCombat()
 end
 
+function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
+	-- If there was no active CT actor/node, forgo StealthTracker processing.
+	if isCTInactiveAndOutsideOfCombatStealthDisallowed() then return false end
+
+	local nodeCT = ActorManager.getCTNode(vActor)
+	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
+		if checkVerbose() then
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), true)
+		end
+
+		return false
+	end
+
+	return true
+end
+
 function checkExpireActionAndRound()
 	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "all"
 end
@@ -505,23 +521,13 @@ end
 function handleUpdateStealth(msgOOB)
 	if not msgOOB or not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
 
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
-	if isCTInactiveAndOutsideOfCombatStealthDisallowed() then return end
-
-	local nodeCT = ActorManager.getCTNode(msgOOB.sCTNodeId)
-	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
-		if checkVerbose() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), true)
-		end
-
-		return
-	end
-
 	-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 	local nStealthTotal = tonumber(msgOOB.nStealthTotal)
 	if not nStealthTotal then return end
 
-	setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
+	if checkAndDisplayAllowOutOfCombatAndTurnChecks(msgOOB.sCTNodeId) then
+		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
+	end
 end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
@@ -873,7 +879,9 @@ function processStealthUpdateForSkillHandlers(rSource, rRoll)
 		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
 			-- The CT name for a PC cannot be edited manually in the CT.  You have to go into character sheet and edit the name field (add a space and remove the space).
-			setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
+			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
+				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
+			end
 		elseif isPlayerStealthInfoDisabled() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
 			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
 			displayChatMessage(output, false)
