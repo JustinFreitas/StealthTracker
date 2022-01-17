@@ -153,14 +153,6 @@ end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
 function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
-	-- If the source is nil but rTarget is present, that is a drag\drop from the chat to the CT for an attack roll. Problem is, there's no way to deduce who the source was.  Instead, let's assume it's the active CT node.
-	if not rSource and USER_ISHOST then
-		local nodeActiveCT = CombatManager.getActiveCT()
-		if not nodeActiveCT then return end
-
-		rSource = ActorManager.resolveActor(nodeActiveCT)
-	end
-
 	-- if no source or no roll then exit, skipping StealthTracker processing.
 	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
 
