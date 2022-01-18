@@ -19,7 +19,7 @@ LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
-ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s.  Drag result to CT actor to apply."
+ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
