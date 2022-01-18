@@ -19,8 +19,7 @@ LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
-ST_DRAG_RESULT_TO_APPLY = "Drag result to CT actor to apply."
-ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s.%s"
+ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s.  Drag result to CT actor to apply."
 USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
@@ -90,18 +89,14 @@ function checkAllowOutOfTurn()
 		   checkAllowOutOfCombat()
 end
 
-function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor, bDragResultInfo)
+function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return false end
 
 	local nodeCT = ActorManager.getCTNode(vActor)
 	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
 		if checkVerbose() then
-			local sDragResultInfo = string.format("  %s", ST_DRAG_RESULT_TO_APPLY)
-			local sText = string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT,
-										"turn",
-										ternary(bDragResultInfo, sDragResultInfo, ""))
-			displayChatMessage(sText, true)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), true)
 		end
 
 		return false
@@ -113,7 +108,7 @@ end
 function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 	if not CombatManager.getActiveCT() and not checkAllowOutOfCombat() then
 		if checkVerbose() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat", ""), true)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat"), true)
 		end
 
 		return true
@@ -239,7 +234,7 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
-			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode, true) then
+			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
 				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
 			end
 		elseif isPlayerStealthInfoDisabled() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
