@@ -222,9 +222,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 
 	-- Expire their stealth effect.
 	expireStealthEffectOnCTNode(rSource, aOutput)
-	if #aOutput > 0 then
-		displayChatMessage(table.concat(aOutput, "\r"), true)
-	end
+	displayTableIfNonEmpty(aOutput)
 end
 
 -- This function executes on clients.
