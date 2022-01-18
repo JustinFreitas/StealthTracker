@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3">
-	<announcement text="StealthTracker v3.4.5 for FGC/FGU v3.3.15+, 5E\rCopyright 2016-22 Justin Freitas (1/9/22)" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.5 for FGC/FGU v3.3.15+, 5E\rCopyright 2016-22 Justin Freitas (1/17/22)" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.4.5</version>
+		<version>3.5</version>
 		<loadorder>999</loadorder>
 		<author>Justin Freitas</author>
-		<description>For the current Combat Tracker actor, chat messages will display for each other CT actor whose tracked stealth roll is greater than the current actor's Passive Perception.  Stealth roll values are tracked in the CT actor node via an effect.  This effect will be automatically added/updated on a Stealth roll (always for GM and only when it's a player's turn for them).</description>
+		<description>Stealth tracking via effect with related information regarding hidden and unaware actors.</description>
 		<ruleset>
 			<name>5E</name>
 		</ruleset>
@@ -15,13 +15,18 @@
 	
 	<base>
 		<string name="option_header_stealthtracker">StealthTracker (GM)</string>
-		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire Stealth effect</string>
+		<string name="option_label_STEALTHTRACKER_ALLOW_OUT_OF">Player: Out of turn or combat stealth</string>
+		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire stealth effect</string>
+		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Ignore stealth same faction</string>
 		<string name="option_label_STEALTHTRACKER_VISIBILITY">Player: Show Stealth info</string>
+		<string name="option_label_STEALTHTRACKER_VERBOSE">Chat: Verbose mode</string>
 		<string name="option_val_action">Action</string>
 		<string name="option_val_action_and_round">Action and Round</string>
 		<string name="option_val_chat_and_effects">Chat and Effects</string>
 		<string name="option_val_effects">Effects</string>
 		<string name="option_val_none">None</string>
+		<string name="option_val_turn">Turn</string>		
+		<string name="option_val_turn_and_combat">Turn and Combat</string>
 
 		<script name="StealthTracker" file="scripts/stealthtracker.lua" />
 		<icon name="stealth_icon" file="graphics/icons/stealth_icon.png" />
