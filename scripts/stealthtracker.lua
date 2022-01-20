@@ -284,6 +284,8 @@ function displayTableIfNonEmpty(aTable, bForce)
 end
 
 function displayTowerRoll(bAttackFromStealth)
+	if checkVerbosityOff() then return end
+
 	local sAnAction = ternary(bAttackFromStealth, "An attack", "A cast save")
 	local sActions = ternary(bAttackFromStealth, "Attacks", "Cast saves")
 	displayChatMessage(string.format("%s was rolled in the tower.  %s should be rolled in the open for proper StealthTracker processing.", sAnAction, sActions), USER_ISHOST)
@@ -808,7 +810,7 @@ function onRollAction(rSource, rTarget, rRoll)
 	local bAttackFromStealth = rRoll.sType == "attack"
 
 	-- When attacks are rolled in the tower, the target is always nil.
-	if not rTarget and rRoll.bSecret and not checkVerbosityOff() then
+	if not rTarget and rRoll.bSecret then
 		displayTowerRoll(bAttackFromStealth)
 	end
 
