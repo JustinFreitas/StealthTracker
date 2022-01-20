@@ -485,9 +485,7 @@ function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
 		deleteAllStealthEffects(nodeCT)
 	end
 
-	if not bForce and checkVerbosityMax() then
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
-	end
+	insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
 end
 
 function getFormattedHiddenAndUnawareTargetsWithTotal(nodeActorCT, aOutput)
