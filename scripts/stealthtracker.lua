@@ -12,6 +12,7 @@
 -- Post roll handlers: onGenericActionPostRoll
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
+FORCE_DISPLAY = true
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
@@ -19,6 +20,7 @@ LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
+SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 USER_ISHOST = false
 
@@ -31,17 +33,17 @@ function onInit()
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	OptionsManager.registerOption2("STEALTHTRACKER_ALLOW_OUT_OF", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
-		{ baselabel = "option_val_none", baseval = "none", labels = "option_val_turn|option_val_turn_and_combat", values = "turn|all", default = "none" })
-	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_action_and_round", baseval = "all", labels = "option_val_action|option_val_none", values = "action|none", default = "all" })
-	OptionsManager.registerOption2("STEALTHTRACKER_FACTION_FILTER", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
-		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" });
+	OptionsManager.registerOption2("STEALTHTRACKER_ALLOW_OUT_OF", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
+		{ baselabel = "option_val_none_STEALTHTRACKER", baseval = "none", labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|all", default = "none" })
+	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
+		{ baselabel = "option_val_action_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_action_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "action|none", default = "all" })
+	OptionsManager.registerOption2("STEALTHTRACKER_FACTION_FILTER", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
+		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
 	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
-	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
-		{ baselabel = "option_val_chat_and_effects", baseval = "all", labels = "option_val_effects|option_val_none", values = "effects|none", default = "effects" })
-	OptionsManager.registerOption2("STEALTHTRACKER_VERBOSE", false, "option_header_stealthtracker", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
-		{ labels = "option_val_on", values = "on", baselabel = "option_val_off", baseval = "off", default = "off" });
+	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
+		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = "all", labels = "option_val_effects_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "effects|none", default = "effects" })
+	OptionsManager.registerOption2("STEALTHTRACKER_VERBOSE", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
+		{ baselabel = "option_val_standard", baseval = "standard", labels = "option_val_max|option_val_off", values = "max|off", default = "standard" })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -95,8 +97,8 @@ function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 
 	local nodeCT = ActorManager.getCTNode(vActor)
 	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
-		if checkVerbose() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), true)
+		if checkVerbosityMax() then
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), SECRET)
 		end
 
 		return false
@@ -107,8 +109,8 @@ end
 
 function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 	if not CombatManager.getActiveCT() and not checkAllowOutOfCombat() then
-		if checkVerbose() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat"), true)
+		if checkVerbosityMax() then
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat"), SECRET)
 		end
 
 		return true
@@ -129,8 +131,12 @@ function checkFactionFilter()
 	return OptionsManager.getOption("STEALTHTRACKER_FACTION_FILTER") == "on"
 end
 
-function checkVerbose()
-	return OptionsManager.getOption("STEALTHTRACKER_VERBOSE") == "on"
+function checkVerbosityMax()
+	return OptionsManager.getOption("STEALTHTRACKER_VERBOSE") == "max"
+end
+
+function checkVerbosityOff()
+	return OptionsManager.getOption("STEALTHTRACKER_VERBOSE") == "off"
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
@@ -157,11 +163,13 @@ function displayChatMessage(sFormattedText, bSecret)
 	end
 end
 
-function displayDebilitatingConditionChatMessage(vActor, sCondition)
+function displayDebilitatingConditionChatMessage(vActor, sCondition, bForce)
+	if not bForce and checkVerbosityOff() then return end
+
 	local sText = string.format("'%s' is %s, skipping StealthTracker processing.",
 								ActorManager.getDisplayName(vActor),
 								sCondition)
-	displayChatMessage(sText, true)
+	displayChatMessage(sText, SECRET)
 end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
@@ -192,7 +200,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 	local aOutput = {}
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
-		if checkVerbose() then
+		if checkVerbosityMax() then
 			local sNoTarget = string.format("No %s target!", ternary(bAttackFromStealth, "attack", "cast save"))
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sNoTarget)
 		end
@@ -237,7 +245,7 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
 				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
 			end
-		elseif isPlayerStealthInfoDisabled() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
+		elseif isPlayerStealthInfoDisabled() and not checkVerbosityOff() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
 			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
 			displayChatMessage(output, false)
 		else
@@ -250,30 +258,34 @@ function displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, bFo
 	-- Check to make sure the CT actor is conscious.  Unconscious actors should not be assessed.
 	local sCondition = getActorDebilitatingCondition(nodeCT)
 	if sCondition then
-		displayDebilitatingConditionChatMessage(nodeCT, sCondition)
+		displayDebilitatingConditionChatMessage(nodeCT, sCondition, bForce)
 		return
 	end
 
 	local aOutput = {}
 	local nCount = getFormattedHiddenAndUnawareTargetsWithTotal(nodeCT, aOutput)
-	if nCount == 0 and (bForce or checkVerbose()) then
+	if nCount == 0 and (bForce or checkVerbosityMax()) then
 		local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeCT))
-		displayChatMessage(sText, true)
+		displayChatMessage(sText, SECRET)
 		return
 	end
 
-	displayTableIfNonEmpty(aOutput)
+	displayTableIfNonEmpty(aOutput, bForce)
 end
 
-function displayTableIfNonEmpty(aTable)
+function displayTableIfNonEmpty(aTable, bForce)
+	if not bForce and checkVerbosityOff() then return end
+
 	aTable = validateTableOrNew(aTable)
 	if #aTable > 0 then
 		local sDisplay = table.concat(aTable, "\r")
-		displayChatMessage(sDisplay, true)
+		displayChatMessage(sDisplay, SECRET)
 	end
 end
 
 function displayTowerRoll(bAttackFromStealth)
+	if checkVerbosityOff() then return end
+
 	local sAnAction = ternary(bAttackFromStealth, "An attack", "A cast save")
 	local sActions = ternary(bAttackFromStealth, "Attacks", "Cast saves")
 	displayChatMessage(string.format("%s was rolled in the tower.  %s should be rolled in the open for proper StealthTracker processing.", sAnAction, sActions), USER_ISHOST)
@@ -339,7 +351,7 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 	-- If a stealth node was found walking the list, expire the effect.
 	if nodeLastEffectWithStealth then
 		if checkExpireNone() then
-			if checkVerbose() then
+			if checkVerbosityMax() then
 				local sText = string.format("'%s' took an action from stealth that should expire the effect.",
 											ActorManager.getDisplayName(rActor))
 				insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
@@ -415,7 +427,7 @@ function getFormattedActorsHiddenFromSource(nodeCTSource, aOutput)
 									table.concat(aHiddenFromSource, "\r"))
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 	else
-		if checkVerbose() then
+		if checkVerbosityMax() then
 			local sText = string.format("There are no actors hidden from '%s'.",
 										ActorManager.getDisplayName(nodeCTSource))
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
@@ -455,7 +467,7 @@ function getFormattedActorsUnawareOfSource(rSource, nStealthSource, aUnawareTarg
 									 table.concat(aUnawareActorNamesAndPP, "\r"))
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sChatMessage)
 	else
-		if checkVerbose() then
+		if checkVerbosityMax() then
 			sChatMessage = string.format("There are no actors unaware of '%s'.",
 										 ActorManager.getDisplayName(rSource))
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sChatMessage)
@@ -464,13 +476,10 @@ function getFormattedActorsUnawareOfSource(rSource, nStealthSource, aUnawareTarg
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
-function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, bForce)
+function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
 	aOutput = validateTableOrNew(aOutput)
-	if not bForce and checkAllowOutOfCombat() then
-		if checkVerbose() then
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "Out of combat Stealth is allowed in the options. Leaving CT stealth effects after reset.")
-		end
-
+	if checkAllowOutOfCombat() then
+		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "Out of combat Stealth is allowed in the options. Leaving CT stealth effects after reset.")
 		return
 	end
 
@@ -479,9 +488,7 @@ function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, bForc
 		deleteAllStealthEffects(nodeCT)
 	end
 
-	if checkVerbose() then
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
-	end
+	insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
 end
 
 function getFormattedHiddenAndUnawareTargetsWithTotal(nodeActorCT, aOutput)
@@ -511,7 +518,7 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
 			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
 			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
-		elseif checkVerbose() then
+		elseif checkVerbosityMax() then
 			-- Target sees the attack coming.  Build appropriate message.
 			sMsgText = string.format("Attacker not hidden. %s", sStats)
 		else
@@ -765,8 +772,8 @@ end
 function onCombatResetEvent()
 	-- We are exiting initiative/combat, so clear all StealthTracker data from CT actors.
 	local aOutput = {}
-	getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, false)
-	displayTableIfNonEmpty(aOutput)
+	getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+	displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
 end
 
 -- Fires when something is dropped on the CT
@@ -853,7 +860,7 @@ function processChatCommand(_, sParams)
 	-- Only allow administrative subcommands when run on the host/DM system.
 	local sFailedSubcommand = processHostOnlySubcommands(sParams)
 	if sFailedSubcommand then
-		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, true)
+		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, SECRET)
 	end
 end
 
@@ -865,9 +872,9 @@ function processHostOnlySubcommands(sSubcommand)
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then
-			displayChatMessage("No active Combat Tracker actor.", true)
+			displayChatMessage("No active Combat Tracker actor.", SECRET)
 		else
-			displayStealthCheckInformationWithConditionAndVerboseChecks(nodeActiveCT, true)
+			displayStealthCheckInformationWithConditionAndVerboseChecks(nodeActiveCT, FORCE_DISPLAY)
 		end
 
 		return
@@ -876,8 +883,8 @@ function processHostOnlySubcommands(sSubcommand)
 	-- Clear all stealth names from CT actors creature nodes.
 	if sSubcommand == "clear" then
 		local aOutput = {}
-		getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, true)
-		displayTableIfNonEmpty(aOutput)
+		getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+		displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
 		return
 	end
 
