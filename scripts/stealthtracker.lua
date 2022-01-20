@@ -20,6 +20,7 @@ LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
+SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 USER_ISHOST = false
 
@@ -97,7 +98,7 @@ function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 	local nodeCT = ActorManager.getCTNode(vActor)
 	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
 		if checkVerbosityMax() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), true)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), SECRET)
 		end
 
 		return false
@@ -109,7 +110,7 @@ end
 function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 	if not CombatManager.getActiveCT() and not checkAllowOutOfCombat() then
 		if checkVerbosityMax() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat"), true)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "combat"), SECRET)
 		end
 
 		return true
@@ -168,7 +169,7 @@ function displayDebilitatingConditionChatMessage(vActor, sCondition, bForce)
 	local sText = string.format("'%s' is %s, skipping StealthTracker processing.",
 								ActorManager.getDisplayName(vActor),
 								sCondition)
-	displayChatMessage(sText, true)
+	displayChatMessage(sText, SECRET)
 end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
@@ -265,7 +266,7 @@ function displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, bFo
 	local nCount = getFormattedHiddenAndUnawareTargetsWithTotal(nodeCT, aOutput)
 	if nCount == 0 and (bForce or checkVerbosityMax()) then
 		local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeCT))
-		displayChatMessage(sText, true)
+		displayChatMessage(sText, SECRET)
 		return
 	end
 
@@ -278,7 +279,7 @@ function displayTableIfNonEmpty(aTable, bForce)
 	aTable = validateTableOrNew(aTable)
 	if #aTable > 0 then
 		local sDisplay = table.concat(aTable, "\r")
-		displayChatMessage(sDisplay, true)
+		displayChatMessage(sDisplay, SECRET)
 	end
 end
 
@@ -857,7 +858,7 @@ function processChatCommand(_, sParams)
 	-- Only allow administrative subcommands when run on the host/DM system.
 	local sFailedSubcommand = processHostOnlySubcommands(sParams)
 	if sFailedSubcommand then
-		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, true)
+		displayChatMessage("Unrecognized subcommand: " .. sFailedSubcommand, SECRET)
 	end
 end
 
@@ -869,7 +870,7 @@ function processHostOnlySubcommands(sSubcommand)
 		-- Get the node for the current CT actor.
 		local nodeActiveCT = CombatManager.getActiveCT()
 		if not nodeActiveCT then
-			displayChatMessage("No active Combat Tracker actor.", true)
+			displayChatMessage("No active Combat Tracker actor.", SECRET)
 		else
 			displayStealthCheckInformationWithConditionAndVerboseChecks(nodeActiveCT, FORCE_DISPLAY)
 		end
