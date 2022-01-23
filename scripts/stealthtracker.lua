@@ -665,8 +665,8 @@ function handleUpdateStealth(msgOOB)
 end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
-function hasValidType(nodeCT)
-	return nodeCT and ActorManager.getType(nodeCT) ~= ""
+function hasValidType(vActor)
+	return ActorManager.getRecordType(vActor) ~= ""
 end
 
 function insertBlankSeparatorIfNotEmpty(aTable)
@@ -694,7 +694,7 @@ function isFriend(vActor)
 end
 
 function isNpc(vActor)
-	return vActor and ActorManager.getType(vActor) == "npc"
+	return ActorManager.getRecordType(vActor) == "npc"
 end
 
 function isPlayerStealthInfoDisabled()
@@ -912,12 +912,9 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 		nEffectDuration = 2  -- because the effect init we used is after the user's turn.
 	end
 
-	local rActor = ActorManager.resolveActor(nodeCT)
-	if not rActor then return end
-
 	-- Check and see if the 'share none' option is enabled.  In that case or non-friendly npcs, we'll want the effect to be GM only.
 	local nEffectGMOnly = booleanToNumber(isPlayerStealthInfoDisabled()
-										  or (isNpc(rActor) and not isFriend(rActor)))
+										  or (isNpc(nodeCT) and not isFriend(nodeCT)))
 	local rEffect = {
 		sName = sEffectName,
 		nInit = nEffectExpirationInit,
