@@ -22,6 +22,11 @@ OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
 SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
+STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
+STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
+STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
+STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
+STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 USER_ISHOST = false
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
@@ -33,16 +38,16 @@ function onInit()
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	OptionsManager.registerOption2("STEALTHTRACKER_ALLOW_OUT_OF", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
+	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
 		{ baselabel = "option_val_none_STEALTHTRACKER", baseval = "none", labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|all", default = "none" })
-	OptionsManager.registerOption2("STEALTHTRACKER_EXPIRE_EFFECT", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
+	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
 		{ baselabel = "option_val_action_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_action_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "action|none", default = "all" })
-	OptionsManager.registerOption2("STEALTHTRACKER_FACTION_FILTER", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
+	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
 		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
 	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
-	OptionsManager.registerOption2("STEALTHTRACKER_VISIBILITY", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
+	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = "all", labels = "option_val_effects_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "effects|none", default = "effects" })
-	OptionsManager.registerOption2("STEALTHTRACKER_VERBOSE", false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
+	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
 		{ baselabel = "option_val_standard", baseval = "standard", labels = "option_val_max|option_val_off", values = "max|off", default = "standard" })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
@@ -83,11 +88,11 @@ function booleanToNumber(bValue)
 end
 
 function checkAllowOutOfCombat()
-	return OptionsManager.getOption("STEALTHTRACKER_ALLOW_OUT_OF") == "all"
+	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "all"
 end
 
 function checkAllowOutOfTurn()
-	return OptionsManager.getOption("STEALTHTRACKER_ALLOW_OUT_OF") == "turn" or
+	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "turn" or
 		   checkAllowOutOfCombat()
 end
 
@@ -120,23 +125,23 @@ function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 end
 
 function checkExpireActionAndRound()
-	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "all"
+	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "all"
 end
 
 function checkExpireNone()
-	return OptionsManager.getOption("STEALTHTRACKER_EXPIRE_EFFECT") == "none"
+	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "none"
 end
 
 function checkFactionFilter()
-	return OptionsManager.getOption("STEALTHTRACKER_FACTION_FILTER") == "on"
+	return OptionsManager.getOption(STEALTHTRACKER_FACTION_FILTER) == "on"
 end
 
 function checkVerbosityMax()
-	return OptionsManager.getOption("STEALTHTRACKER_VERBOSE") == "max"
+	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "max"
 end
 
 function checkVerbosityOff()
-	return OptionsManager.getOption("STEALTHTRACKER_VERBOSE") == "off"
+	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "off"
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
@@ -698,7 +703,7 @@ function isNpc(vActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	return OptionsManager.getOption("STEALTHTRACKER_VISIBILITY") == "none"
+	return OptionsManager.getOption(STEALTHTRACKER_VISIBILITY) == "none"
 end
 
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
