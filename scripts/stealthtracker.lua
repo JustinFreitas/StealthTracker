@@ -743,7 +743,7 @@ function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
 	-- Capturing the username allows for the effect to be built so that it can be deleted by the client.
 	msgOOB.sSourceCTNode = sSourceCTNode
 	msgOOB.sTargetCTNode = sTargetCTNode
-	Comm.deliverOOBMessage(msgOOB)
+	Comm.deliverOOBMessage(msgOOB, "")
 end
 
 -- Function to notify the host of a stealth update request.  The arguments are the CT node identifier and the stealth total number.
@@ -760,7 +760,7 @@ function notifyUpdateStealth(sCTNodeId, nStealthTotal)
 	-- Note: numbers will be serialized as strings in the OOB msg.
 	msgOOB.nStealthTotal = nStealthTotal
 
-	Comm.deliverOOBMessage(msgOOB)
+	Comm.deliverOOBMessage(msgOOB, "")
 end
 
 -- Fires when the initiative is cleared via the CT menu.  Wired up in onInit() for the host only.
