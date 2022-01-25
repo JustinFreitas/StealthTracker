@@ -6,9 +6,9 @@
 -- Justin Freitas or, where applicable, any and all other Copyright holders.
 
 -- Things to test--
--- Handlers: onTurnStartEvent(), onCombatResetEvent(), onDropEvent().
--- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ACTIONFROMSTEALTH.
--- onRoll Overrides: onRollSkill, onRollAction.
+-- Handlers: onTurnStartEvent(), onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT.
+-- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
+-- onRoll Overrides: onDropEvent , onRollSkill (stealth), onRollAttack.
 -- Post roll handlers: onGenericActionPostRoll
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
@@ -19,7 +19,7 @@ LOCALIZED_STEALTH = "Stealth"
 LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
-OOB_MSGTYPE_ACTIONFROMSTEALTH = "actionfromstealth"
+OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
@@ -41,7 +41,7 @@ function onInit()
 	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
 		{ baselabel = "option_val_none_STEALTHTRACKER", baseval = "none", labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|all", default = "none" })
 	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_action_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_action_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "action|none", default = "all" })
+		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_attack_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "attack|none", default = "all" })
 	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
 		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
 	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
@@ -57,7 +57,7 @@ function onInit()
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
 		CombatManager.setCustomDrop(onDropEvent)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
-		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ACTIONFROMSTEALTH, handleActionFromStealth)
+		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
 		-- Register chat commands for host only.
 		Comm.registerSlashHandler("stealth", processChatCommand)
@@ -68,11 +68,8 @@ function onInit()
 	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
 	ActionAttack.onAttackStealthTracker = ActionAttack.onAttack
-	ActionAttack.onAttack = onRollAction
-	ActionsManager.registerResultHandler("attack", onRollAction)
-	ActionPower.onCastSaveStealthTracker = ActionPower.onCastSave
-	ActionPower.onCastSave = onRollAction
-	ActionsManager.registerResultHandler("castsave", onRollAction)
+	ActionAttack.onAttack = onRollAttack
+	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
 	if ActionGeneral then
@@ -177,8 +174,8 @@ function displayDebilitatingConditionChatMessage(vActor, sCondition, bForce)
 	displayChatMessage(sText, SECRET)
 end
 
--- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).  It's call from BOTH an attack roll and a spell attack roll (i.e. cast and castattack).
-function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
+-- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).
+function displayProcessAttackFromStealth(rSource, rTarget)
 	-- if no source or no roll then exit, skipping StealthTracker processing.
 	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
 
@@ -188,7 +185,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 
 	if not USER_ISHOST then
 		-- For clients notify of an action from stealth and then exit.  Host handler will pick up message and run code after this block.
-		notifyActionFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "", bAttackFromStealth)
+		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "")
 		return
 	end
 
@@ -206,8 +203,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
 		if checkVerbosityMax() then
-			local sNoTarget = string.format("No %s target!", ternary(bAttackFromStealth, "attack", "cast save"))
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sNoTarget)
+			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "No attack target!")
 		end
 
 		getFormattedHiddenAndUnawareTargetsWithTotal(nodeSourceCT, aOutput)
@@ -216,8 +212,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
 			-- Warn the chat that the target might be hidden
-			local sMsgText = string.format("Target hidden. %s possible? ('%s' %s: %d, '%s' PP: %d).",
-											ternary(bAttackFromStealth, "Attack", "Cast"),
+			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
@@ -228,7 +223,7 @@ function displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
 
 		local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
 		-- If the attacker/source was hiding, then check to see if the target can see the attack coming by comparing that stealth to the target's PP.
-		if nStealthSource and bAttackFromStealth then -- not necessary for castsave
+		if nStealthSource then
 			getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
 		end
 	end
@@ -288,12 +283,10 @@ function displayTableIfNonEmpty(aTable, bForce)
 	end
 end
 
-function displayTowerRoll(bAttackFromStealth)
+function displayTowerRoll()
 	if checkVerbosityOff() then return end
 
-	local sAnAction = ternary(bAttackFromStealth, "An attack", "A cast save")
-	local sActions = ternary(bAttackFromStealth, "Attacks", "Cast saves")
-	displayChatMessage(string.format("%s was rolled in the tower.  %s should be rolled in the open for proper StealthTracker processing.", sAnAction, sActions), USER_ISHOST)
+	displayChatMessage("An attack was rolled in the tower.  Attacks should be rolled in the open for proper StealthTracker processing.", USER_ISHOST)
 end
 
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
@@ -357,7 +350,7 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 	if nodeLastEffectWithStealth then
 		if checkExpireNone() then
 			if checkVerbosityMax() then
-				local sText = string.format("'%s' took an action from stealth that should expire the effect.",
+				local sText = string.format("'%s' took an attack from stealth that should expire the effect.",
 											ActorManager.getDisplayName(rActor))
 				insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 			end
@@ -650,10 +643,8 @@ function getUnawareCTTargetsGivenSource(rSource)
 end
 
 -- Handler for the message to do an attack from a position of stealth.
-function handleActionFromStealth(msgOOB)
-	displayProcessActionFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode),
-							 ActorManager.resolveActor(msgOOB.sTargetCTNode),
-							 msgOOB.bAttackFromStealth)
+function handleAttackFromStealth(msgOOB)
+	displayProcessAttackFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode), ActorManager.resolveActor(msgOOB.sTargetCTNode))
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
@@ -742,18 +733,17 @@ function isValidCTNode(nodeCT)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
-function notifyActionFromStealth(sSourceCTNode, sTargetCTNode, bAttackFromStealth)
+function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
 	if not sSourceCTNode or not sTargetCTNode then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
-	msgOOB.type = OOB_MSGTYPE_ACTIONFROMSTEALTH
-	msgOOB.bAttackFromStealth = bAttackFromStealth
+	msgOOB.type = OOB_MSGTYPE_ATTACKFROMSTEALTH
 
 	-- Capturing the username allows for the effect to be built so that it can be deleted by the client.
 	msgOOB.sSourceCTNode = sSourceCTNode
 	msgOOB.sTargetCTNode = sTargetCTNode
-	Comm.deliverOOBMessage(msgOOB, "")
+	Comm.deliverOOBMessage(msgOOB)
 end
 
 -- Function to notify the host of a stealth update request.  The arguments are the CT node identifier and the stealth total number.
@@ -770,7 +760,7 @@ function notifyUpdateStealth(sCTNodeId, nStealthTotal)
 	-- Note: numbers will be serialized as strings in the OOB msg.
 	msgOOB.nStealthTotal = nStealthTotal
 
-	Comm.deliverOOBMessage(msgOOB, "")
+	Comm.deliverOOBMessage(msgOOB)
 end
 
 -- Fires when the initiative is cleared via the CT menu.  Wired up in onInit() for the host only.
@@ -808,25 +798,15 @@ function onGenericActionPostRoll(rSource, rRoll)
 	end
 end
 
--- Action roll handler, currently used for roll types 'attack' and 'powersave' (cast save).
-function onRollAction(rSource, rTarget, rRoll)
-	if not rRoll or not rRoll.sType then return end
-
-	local bAttackFromStealth = rRoll.sType == "attack"
+function onRollAttack(rSource, rTarget, rRoll)
+	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
 
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
-		displayTowerRoll(bAttackFromStealth)
+		displayTowerRoll()
 	end
 
-	if bAttackFromStealth then
-		-- Call the stored (during initialization in onInit()) attack roll handler.
-		ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
-	else
-		ActionPower.onCastSaveStealthTracker(rSource, rTarget, rRoll)
-	end
-
-	displayProcessActionFromStealth(rSource, rTarget, bAttackFromStealth)
+	displayProcessAttackFromStealth(rSource, rTarget)
 end
 
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
