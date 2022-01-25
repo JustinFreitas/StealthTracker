@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.6.1 by Justin Freitas
+StealthTracker v3.6.2 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -53,6 +53,7 @@ Changelist:
 - v3.4.5 - gmatch was a mistake entirely, revert to gsub
 - v3.5 - Bug fix for incorrect stat reporting in attack from stealth scenario.  Don't process stealth on debilitated actors or actors of the same faction as the one being analyzed (unless Faction Filter option is set to off).  Massive reduction in chat verbosity. New option for verbose output that's mostly for clarifying information when no output is actually necessary (defaults to off). Thanks to Ludd_G for the suggestions and inspiration.  Wiring of castsave through the messaging mechanism and refactor attack and castsave to reduce duplication.  Only one StealthTracker chat entry per roll or turn or command, this required some rework on how things are displayed in chat.  Everything is done host side now except for tower checks.  New option to allow for out of turn or out of combat stealth tracking and functionality (defaults to off/none).
 - v3.6 - Changed the existing Verbosity option to allow for disabling StealthTracker chat output.  Just set it to 'off'.  Standard is the default and has normal StealthTracker output.  Max has all Standard output, plus some additional.  Thanks to MrDDT for the suggestion.
-- v3.6.1 - I ripped out the expiration of stealth on cast.  Spell casts that have attack rolls will still work as those are attacks already.  Any spell that is a save could be argued either way so I'll leave expiration in those cases up to the DM. 
+- v3.6.1 - I ripped out the expiration of stealth on cast.  Spell casts that have attack rolls will still work as those are attacks already.  Any spell that is a save could be argued either way so I'll leave expiration in those cases up to the DM.
+- v3.6.2 - Fix for the broadcast from client to server with unrecognized message error.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
