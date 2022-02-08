@@ -44,7 +44,6 @@ function onInit()
 		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_attack_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "attack|none", default = "all" })
 	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
 		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
-	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
 	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
 		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = "all", labels = "option_val_effects_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "effects|none", default = "effects" })
 	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
