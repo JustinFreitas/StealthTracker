@@ -78,7 +78,6 @@ end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
 
--- Converts a boolean into a number.
 function booleanToNumber(bValue)
 	return bValue == true and 1 or bValue == false and 0
 end
@@ -93,7 +92,6 @@ function checkAllowOutOfTurn()
 end
 
 function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return false end
 
 	local nodeCT = ActorManager.getCTNode(vActor)
@@ -156,7 +154,7 @@ function displayChatMessage(sFormattedText, bSecret)
 	if not sFormattedText then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
-	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
+	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
 	else
@@ -189,7 +187,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	end
 
 	-- HOST ONLY PROCESSING STARTS HERE ----------------------------------------------------------------------------------------------------------
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return end
 
 	local sCondition = getActorDebilitatingCondition(nodeSourceCT)
@@ -199,7 +196,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	end
 
 	local aOutput = {}
-	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
 		if checkVerbosityMax() then
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "No attack target!")
@@ -207,10 +203,8 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 
 		getFormattedHiddenAndUnawareTargetsWithTotal(nodeSourceCT, aOutput)
 	else
-		-- Check to see if the source can perceive the target.
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
-			-- Warn the chat that the target might be hidden
 			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
@@ -227,7 +221,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 		end
 	end
 
-	-- Expire their stealth effect.
 	expireStealthEffectOnCTNode(rSource, aOutput)
 	displayTableIfNonEmpty(aOutput)
 end
