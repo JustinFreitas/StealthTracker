@@ -29,6 +29,8 @@ STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 USER_ISHOST = false
 
+local ActionSkill_onRoll, ActionAttack_onAttack
+
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
@@ -63,10 +65,10 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
+	ActionSkill_onRoll = ActionSkill.onRoll
 	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionAttack.onAttackStealthTracker = ActionAttack.onAttack
+	ActionAttack_onAttack = ActionAttack.onAttack
 	ActionAttack.onAttack = onRollAttack
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
@@ -83,11 +85,11 @@ function booleanToNumber(bValue)
 end
 
 function checkAllowOutOfCombat()
-	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "all"
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, "all")
 end
 
 function checkAllowOutOfTurn()
-	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "turn" or
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, "turn") or
 		   checkAllowOutOfCombat()
 end
 
@@ -119,23 +121,23 @@ function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 end
 
 function checkExpireActionAndRound()
-	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "all"
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, "all")
 end
 
 function checkExpireNone()
-	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "none"
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, "none")
 end
 
 function checkFactionFilter()
-	return OptionsManager.getOption(STEALTHTRACKER_FACTION_FILTER) == "on"
+	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, "on")
 end
 
 function checkVerbosityMax()
-	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "max"
+	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, "max")
 end
 
 function checkVerbosityOff()
-	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "off"
+	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, "off")
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
@@ -686,7 +688,7 @@ function isNpc(vActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	return OptionsManager.getOption(STEALTHTRACKER_VISIBILITY) == "none"
+	return OptionsManager.isOption(STEALTHTRACKER_VISIBILITY, "none")
 end
 
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
@@ -791,7 +793,7 @@ function onGenericActionPostRoll(rSource, rRoll)
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
-	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
+	ActionAttack_onAttack(rSource, rTarget, rRoll)
 
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
@@ -804,7 +806,7 @@ end
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
-	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
+	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill_onRoll(rSource, rTarget, rRoll))
 	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
@@ -819,7 +821,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 	end
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
-	ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll)
+	ActionSkill_onRoll(rSource, rTarget, rRoll)
 	if not bProcessStealth then return end
 
 	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
