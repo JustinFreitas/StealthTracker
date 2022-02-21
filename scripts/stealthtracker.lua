@@ -1,10 +1,3 @@
--- (c) Copyright Justin Freitas 2022+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2022 SmiteWorks USA LLC.
--- Copyright to other material within this file may be held by other Individuals and/or Entities.
--- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
--- transmitted or otherwise manipulated in ANY way without the explicit written consent of
--- Justin Freitas or, where applicable, any and all other Copyright holders.
-
 -- Things to test--
 -- Handlers: onTurnStartEvent(), onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT.
 -- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
@@ -12,12 +5,19 @@
 -- Post roll handlers: onGenericActionPostRoll
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
+ALL = "all"
+DEXTERITY = "dexterity"
+EFFECTS = "effects"
 FORCE_DISPLAY = true
+GENACTROLL = "genactroll"
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
 LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+NONE = "none"
+OFF = "off"
+ON = "on"
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 SECRET = true
@@ -27,29 +27,36 @@ STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
+TURN = "turn"
 USER_ISHOST = false
 
 local ActionSkill_onRoll, ActionAttack_onAttack
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
+	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
-		{ baselabel = "option_val_none_STEALTHTRACKER", baseval = "none", labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|all", default = "none" })
-	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_attack_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "attack|none", default = "all" })
-	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
-		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
-	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
-		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = "all", labels = "option_val_effects_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "effects|none", default = "effects" })
-	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
-		{ baselabel = "option_val_standard", baseval = "standard", labels = "option_val_max|option_val_off", values = "max|off", default = "standard" })
+	local option_entry_cycler = "option_entry_cycler"
+	local option_header = "option_header_STEALTHTRACKER"
+	local option_val_none = "option_val_none_STEALTHTRACKER"
+	local option_val_off = "option_val_off"
+	local standard = "standard"
+
+	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
+		{ baselabel = option_val_none, baseval = NONE, labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|" .. ALL, default = NONE })
+	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, option_header, "option_label_STEALTHTRACKER_EXPIRE_EFFECT", option_entry_cycler,
+		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = ALL, labels = "option_val_attack_STEALTHTRACKER|" .. option_val_none, values = "attack|" .. NONE, default = ALL })
+	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, option_header, "option_label_STEALTHTRACKER_FACTION_FILTER", option_entry_cycler,
+		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, option_header, "option_label_STEALTHTRACKER_VISIBILITY", option_entry_cycler,
+		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
+	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
+		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -74,7 +81,7 @@ function onInit()
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
 	if ActionGeneral then
-		ActionsManager.registerPostRollHandler("genactroll", onGenericActionPostRoll)
+		ActionsManager.registerPostRollHandler(GENACTROLL, onGenericActionPostRoll)
 	end
 end
 
@@ -85,11 +92,11 @@ function booleanToNumber(bValue)
 end
 
 function checkAllowOutOfCombat()
-	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, "all")
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, ALL)
 end
 
 function checkAllowOutOfTurn()
-	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, "turn") or
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, TURN) or
 		   checkAllowOutOfCombat()
 end
 
@@ -99,7 +106,7 @@ function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 	local nodeCT = ActorManager.getCTNode(vActor)
 	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
 		if checkVerbosityMax() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), SECRET)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, TURN), SECRET)
 		end
 
 		return false
@@ -121,15 +128,15 @@ function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 end
 
 function checkExpireActionAndRound()
-	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, "all")
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, ALL)
 end
 
 function checkExpireNone()
-	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, "none")
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, NONE)
 end
 
 function checkFactionFilter()
-	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, "on")
+	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
 end
 
 function checkVerbosityMax()
@@ -137,14 +144,14 @@ function checkVerbosityMax()
 end
 
 function checkVerbosityOff()
-	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, "off")
+	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, OFF)
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
 function deleteAllStealthEffects(nodeCT)
 	if not nodeCT then return end
 
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		if getStealthValueFromEffectNode(nodeEffect) then
 			nodeEffect.delete()
 		end
@@ -298,7 +305,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, "dexterity")
+	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, DEXTERITY)
 	local sStealthWithMod = LOCALIZED_STEALTH .. " "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -540,7 +547,7 @@ end
 -- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
 function getOrderedEffectsTableFromCTNode(nodeCT)
 	local aCTNodes = {}
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		table.insert(aCTNodes, nodeEffect)
 	end
 
@@ -688,7 +695,7 @@ function isNpc(vActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	return OptionsManager.isOption(STEALTHTRACKER_VISIBILITY, "none")
+	return OptionsManager.isOption(STEALTHTRACKER_VISIBILITY, NONE)
 end
 
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
@@ -786,7 +793,7 @@ end
 
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
-	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == "genactroll" and rRoll.sGenericAction == "Hide" then
+	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == GENACTROLL and rRoll.sGenericAction == "Hide" then
 		ActionsManager2.decodeAdvantage(rRoll) -- this is done automatically for ruleset (i.e. Stealth) rolls
 		displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	end
