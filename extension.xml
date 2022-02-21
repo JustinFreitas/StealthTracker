@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3">
-	<announcement text="StealthTracker v3.6.3 FGC/FGU 5E, 2/9/22\r2016-2022 Justin Freitas" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.6.3 FGC/FGU 5E, 2/21/22\r2016-2022 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
 		<version>3.6.3</version>
