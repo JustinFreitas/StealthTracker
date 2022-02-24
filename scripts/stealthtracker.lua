@@ -911,12 +911,10 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	EffectManager.addEffect("", "", nodeCT, rEffect, true)
 end
 
--- Function to serve as a ternary operator (i.e. cond ? T : F)
-function ternary(cond, T, F)
-	if cond then return T else return F end
-end
-
--- If the table is present and a table, use it.  Otherwise, empty table.
 function validateTableOrNew(aTable)
-	return ternary(aTable and type(aTable) == "table", aTable, {})
+	if aTable and type(aTable) == "table" then
+		return aTable
+	else
+		return {}
+	end
 end
