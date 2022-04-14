@@ -10,6 +10,8 @@ DEXTERITY = "dexterity"
 EFFECTS = "effects"
 FORCE_DISPLAY = true
 GENACTROLL = "genactroll"
+IS_FGC = false
+LAST_DRAG_INFO = nil
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
@@ -30,10 +32,11 @@ STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
 USER_ISHOST = false
 
-local ActionSkill_onRoll, ActionAttack_onAttack
+local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
+	IS_FGC = checkFGC()
 	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
@@ -63,7 +66,8 @@ function onInit()
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
-		CombatManager.setCustomDrop(onDropEvent)
+		CombatManager_onDrop = CombatManager.onDrop
+		CombatManager.onDrop = onDrop
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
@@ -137,6 +141,13 @@ end
 
 function checkFactionFilter()
 	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
+end
+
+function checkFGC()
+	local nMajor, nMinor, nPatch = Interface.getVersion()
+	if nMajor <= 2 then return true end
+	if nMajor == 3 and nMinor <= 2 then return true end
+	return nMajor == 3 and nMinor == 3 and nPatch <= 15
 end
 
 function checkVerbosityMax()
@@ -772,23 +783,36 @@ function onCombatResetEvent()
 	displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
 end
 
+function onDrop(nodetype, nodename, draginfo)
+	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  Is it FGC only?
+	if IS_FGC then
+		if LAST_DRAG_INFO == draginfo then
+			LAST_DRAG_INFO = nil
+			return
+		end
+
+		LAST_DRAG_INFO = draginfo
+	end
+
+	local rSource = ActionsManager.decodeActors(draginfo)
+	local rTarget = ActorManager.resolveActor(nodename)
+	onDropEvent(rSource, rTarget, draginfo)
+	CombatManager_onDrop(nodetype, nodename, draginfo)
+end
+
 -- Fires when something is dropped on the CT
 function onDropEvent(rSource, rTarget, draginfo)
-
 	-- If rSource isn't nil, then the drag came from a sheet and not the chat.
-	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return true end
+	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return end
 
 	local sDragInfoData = draginfo.getStringData()
-	if not sDragInfoData or sDragInfoData == "" then return true end
+	if not sDragInfoData or sDragInfoData == "" then return end
 
 	-- If the dropped item was a stealth roll or dex check, update the target creature node with the stealth value.
 	local nStealthValue = draginfo.getNumberData()
 	if nStealthValue and (isStealthSkillRoll(sDragInfoData) or isDexterityCheckRoll(sDragInfoData)) then
 		setNodeWithStealthValue(rTarget.sCTNode, nStealthValue)
 	end
-
-	-- This is required, otherwise, the wired drop handler fires twice.  It terminates the default drop processing.
-	return true
 end
 
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
