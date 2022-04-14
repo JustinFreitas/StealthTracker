@@ -1,10 +1,3 @@
--- (c) Copyright Justin Freitas 2022+ except where explicitly stated otherwise.
--- Fantasy Grounds is Copyright (c) 2004-2022 SmiteWorks USA LLC.
--- Copyright to other material within this file may be held by other Individuals and/or Entities.
--- Nothing in or from this LUA file in printed, electronic and/or any other form may be used, copied,
--- transmitted or otherwise manipulated in ANY way without the explicit written consent of
--- Justin Freitas or, where applicable, any and all other Copyright holders.
-
 -- Things to test--
 -- Handlers: onTurnStartEvent(), onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT.
 -- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
@@ -12,12 +5,21 @@
 -- Post roll handlers: onGenericActionPostRoll
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
+ALL = "all"
+DEXTERITY = "dexterity"
+EFFECTS = "effects"
 FORCE_DISPLAY = true
+GENACTROLL = "genactroll"
+IS_FGC = false
+LAST_DRAG_INFO = nil
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
 LOCALIZED_STEALTH_ABV = "S"
 LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+NONE = "none"
+OFF = "off"
+ON = "on"
 OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
 OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 SECRET = true
@@ -27,35 +29,45 @@ STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
+TURN = "turn"
 USER_ISHOST = false
+
+local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	LOCALIZED_DEXTERITY = Interface.getString("dexterity")
+	IS_FGC = checkFGC()
+	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_ALLOW_OUT_OF", "option_entry_cycler",
-		{ baselabel = "option_val_none_STEALTHTRACKER", baseval = "none", labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|all", default = "none" })
-	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_EXPIRE_EFFECT", "option_entry_cycler",
-		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = "all", labels = "option_val_attack_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "attack|none", default = "all" })
-	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_FACTION_FILTER", "option_entry_cycler",
-		{ labels = "option_val_off", values = "off", baselabel = "option_val_on", baseval = "on", default = "on" })
-	-- TODO: Chat visibility?  Should we allow it for anything or remove the option?  Right now it does nothing, only none and effect have meaning.  With one chat per action would require two lists.
-	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VISIBILITY", "option_entry_cycler",
-		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = "all", labels = "option_val_effects_STEALTHTRACKER|option_val_none_STEALTHTRACKER", values = "effects|none", default = "effects" })
-	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, "option_header_STEALTHTRACKER", "option_label_STEALTHTRACKER_VERBOSE", "option_entry_cycler",
-		{ baselabel = "option_val_standard", baseval = "standard", labels = "option_val_max|option_val_off", values = "max|off", default = "standard" })
+	local option_entry_cycler = "option_entry_cycler"
+	local option_header = "option_header_STEALTHTRACKER"
+	local option_val_none = "option_val_none_STEALTHTRACKER"
+	local option_val_off = "option_val_off"
+	local standard = "standard"
+
+	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
+		{ baselabel = option_val_none, baseval = NONE, labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|" .. ALL, default = NONE })
+	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, option_header, "option_label_STEALTHTRACKER_EXPIRE_EFFECT", option_entry_cycler,
+		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = ALL, labels = "option_val_attack_STEALTHTRACKER|" .. option_val_none, values = "attack|" .. NONE, default = ALL })
+	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, option_header, "option_label_STEALTHTRACKER_FACTION_FILTER", option_entry_cycler,
+		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, option_header, "option_label_STEALTHTRACKER_VISIBILITY", option_entry_cycler,
+		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
+	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
+		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
-		CombatManager.setCustomDrop(onDropEvent)
+		CombatManager_onDrop = CombatManager.onDrop
+		CombatManager.onDrop = onDrop
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
@@ -64,43 +76,41 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	ActionSkill.onRollStealthTracker = ActionSkill.onRoll
+	ActionSkill_onRoll = ActionSkill.onRoll
 	ActionSkill.onRoll = onRollSkill
 	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionAttack.onAttackStealthTracker = ActionAttack.onAttack
+	ActionAttack_onAttack = ActionAttack.onAttack
 	ActionAttack.onAttack = onRollAttack
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
 	if ActionGeneral then
-		ActionsManager.registerPostRollHandler("genactroll", onGenericActionPostRoll)
+		ActionsManager.registerPostRollHandler(GENACTROLL, onGenericActionPostRoll)
 	end
 end
 
 -- Alphebetical list of functions below (onInit() above was an exception)
 
--- Converts a boolean into a number.
 function booleanToNumber(bValue)
 	return bValue == true and 1 or bValue == false and 0
 end
 
 function checkAllowOutOfCombat()
-	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "all"
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, ALL)
 end
 
 function checkAllowOutOfTurn()
-	return OptionsManager.getOption(STEALTHTRACKER_ALLOW_OUT_OF) == "turn" or
+	return OptionsManager.isOption(STEALTHTRACKER_ALLOW_OUT_OF, TURN) or
 		   checkAllowOutOfCombat()
 end
 
 function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return false end
 
 	local nodeCT = ActorManager.getCTNode(vActor)
 	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
 		if checkVerbosityMax() then
-			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, "turn"), SECRET)
+			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, TURN), SECRET)
 		end
 
 		return false
@@ -122,30 +132,37 @@ function checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed()
 end
 
 function checkExpireActionAndRound()
-	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "all"
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, ALL)
 end
 
 function checkExpireNone()
-	return OptionsManager.getOption(STEALTHTRACKER_EXPIRE_EFFECT) == "none"
+	return OptionsManager.isOption(STEALTHTRACKER_EXPIRE_EFFECT, NONE)
 end
 
 function checkFactionFilter()
-	return OptionsManager.getOption(STEALTHTRACKER_FACTION_FILTER) == "on"
+	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
+end
+
+function checkFGC()
+	local nMajor, nMinor, nPatch = Interface.getVersion()
+	if nMajor <= 2 then return true end
+	if nMajor == 3 and nMinor <= 2 then return true end
+	return nMajor == 3 and nMinor == 3 and nPatch <= 15
 end
 
 function checkVerbosityMax()
-	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "max"
+	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, "max")
 end
 
 function checkVerbosityOff()
-	return OptionsManager.getOption(STEALTHTRACKER_VERBOSE) == "off"
+	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, OFF)
 end
 
 -- Deletes all of the stealth effects for a CT node (no expiration warning because this is cleanup and not effect usage causing the deletion).
 function deleteAllStealthEffects(nodeCT)
 	if not nodeCT then return end
 
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		if getStealthValueFromEffectNode(nodeEffect) then
 			nodeEffect.delete()
 		end
@@ -157,7 +174,7 @@ function displayChatMessage(sFormattedText, bSecret)
 	if not sFormattedText then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
-	-- IMPORTANT NOTE: deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
+	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
 	else
@@ -190,7 +207,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	end
 
 	-- HOST ONLY PROCESSING STARTS HERE ----------------------------------------------------------------------------------------------------------
-	-- If there was no active CT actor/node, forgo StealthTracker processing.
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return end
 
 	local sCondition = getActorDebilitatingCondition(nodeSourceCT)
@@ -200,7 +216,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	end
 
 	local aOutput = {}
-	-- Do special StealthTracker handling if there was no target set.  After this special processing, exit/return.
 	if not rTarget then
 		if checkVerbosityMax() then
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "No attack target!")
@@ -208,10 +223,8 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 
 		getFormattedHiddenAndUnawareTargetsWithTotal(nodeSourceCT, aOutput)
 	else
-		-- Check to see if the source can perceive the target.
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
-			-- Warn the chat that the target might be hidden
 			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
@@ -228,7 +241,6 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 		end
 	end
 
-	-- Expire their stealth effect.
 	expireStealthEffectOnCTNode(rSource, aOutput)
 	displayTableIfNonEmpty(aOutput)
 end
@@ -304,7 +316,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, "dexterity")
+	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, DEXTERITY)
 	local sStealthWithMod = LOCALIZED_STEALTH .. " "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -546,7 +558,7 @@ end
 -- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
 function getOrderedEffectsTableFromCTNode(nodeCT)
 	local aCTNodes = {}
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, "effects")) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		table.insert(aCTNodes, nodeEffect)
 	end
 
@@ -694,7 +706,7 @@ function isNpc(vActor)
 end
 
 function isPlayerStealthInfoDisabled()
-	return OptionsManager.getOption(STEALTHTRACKER_VISIBILITY) == "none"
+	return OptionsManager.isOption(STEALTHTRACKER_VISIBILITY, NONE)
 end
 
 -- Checks to see if the roll description (or drag info data) is a stealth skill roll.
@@ -771,35 +783,48 @@ function onCombatResetEvent()
 	displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
 end
 
+function onDrop(nodetype, nodename, draginfo)
+	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  It is FGC only.
+	if IS_FGC then
+		if LAST_DRAG_INFO == draginfo then
+			LAST_DRAG_INFO = nil
+			return
+		end
+
+		LAST_DRAG_INFO = draginfo
+	end
+
+	local rSource = ActionsManager.decodeActors(draginfo)
+	local rTarget = ActorManager.resolveActor(nodename)
+	onDropEvent(rSource, rTarget, draginfo)
+	CombatManager_onDrop(nodetype, nodename, draginfo)
+end
+
 -- Fires when something is dropped on the CT
 function onDropEvent(rSource, rTarget, draginfo)
-
 	-- If rSource isn't nil, then the drag came from a sheet and not the chat.
-	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return true end
+	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return end
 
 	local sDragInfoData = draginfo.getStringData()
-	if not sDragInfoData or sDragInfoData == "" then return true end
+	if not sDragInfoData or sDragInfoData == "" then return end
 
 	-- If the dropped item was a stealth roll or dex check, update the target creature node with the stealth value.
 	local nStealthValue = draginfo.getNumberData()
 	if nStealthValue and (isStealthSkillRoll(sDragInfoData) or isDexterityCheckRoll(sDragInfoData)) then
 		setNodeWithStealthValue(rTarget.sCTNode, nStealthValue)
 	end
-
-	-- This is required, otherwise, the wired drop handler fires twice.  It terminates the default drop processing.
-	return true
 end
 
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
-	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == "genactroll" and rRoll.sGenericAction == "Hide" then
+	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == GENACTROLL and rRoll.sGenericAction == "Hide" then
 		ActionsManager2.decodeAdvantage(rRoll) -- this is done automatically for ruleset (i.e. Stealth) rolls
 		displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	end
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
-	ActionAttack.onAttackStealthTracker(rSource, rTarget, rRoll)
+	ActionAttack_onAttack(rSource, rTarget, rRoll)
 
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
@@ -812,7 +837,7 @@ end
 -- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
 -- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
 function onRollSkill(rSource, rTarget, rRoll)
-	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll))
+	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill_onRoll(rSource, rTarget, rRoll))
 	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
 
 	-- If we are processing stealth, update the roll display to remove any existing stealth info.
@@ -827,7 +852,7 @@ function onRollSkill(rSource, rTarget, rRoll)
 	end
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
-	ActionSkill.onRollStealthTracker(rSource, rTarget, rRoll)
+	ActionSkill_onRoll(rSource, rTarget, rRoll)
 	if not bProcessStealth then return end
 
 	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
@@ -910,12 +935,10 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 	EffectManager.addEffect("", "", nodeCT, rEffect, true)
 end
 
--- Function to serve as a ternary operator (i.e. cond ? T : F)
-function ternary(cond, T, F)
-	if cond then return T else return F end
-end
-
--- If the table is present and a table, use it.  Otherwise, empty table.
 function validateTableOrNew(aTable)
-	return ternary(aTable and type(aTable) == "table", aTable, {})
+	if aTable and type(aTable) == "table" then
+		return aTable
+	else
+		return {}
+	end
 end
