@@ -784,7 +784,7 @@ function onCombatResetEvent()
 end
 
 function onDrop(nodetype, nodename, draginfo)
-	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  Is it FGC only?
+	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  It is FGC only.
 	if IS_FGC then
 		if LAST_DRAG_INFO == draginfo then
 			LAST_DRAG_INFO = nil
