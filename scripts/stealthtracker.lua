@@ -12,6 +12,8 @@ FORCE_DISPLAY = true
 GENACTROLL = "genactroll"
 IS_FGC = false
 LAST_DRAG_INFO = nil
+LAST_NODE_NAME = nil
+LAST_NODE_TYPE = nil
 LOCALIZED_DEXTERITY = "Dexterity"
 LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 LOCALIZED_STEALTH = "Stealth"
@@ -144,10 +146,8 @@ function checkFactionFilter()
 end
 
 function checkFGC()
-	local nMajor, nMinor, nPatch = Interface.getVersion()
-	if nMajor <= 2 then return true end
-	if nMajor == 3 and nMinor <= 2 then return true end
-	return nMajor == 3 and nMinor == 3 and nPatch <= 15
+	local nMajor = Interface.getVersion()
+	return nMajor < 4
 end
 
 function checkVerbosityMax()
@@ -786,12 +786,18 @@ end
 function onDrop(nodetype, nodename, draginfo)
 	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  It is FGC only.
 	if IS_FGC then
-		if LAST_DRAG_INFO == draginfo then
+		if LAST_DRAG_INFO == draginfo and
+		   LAST_NODE_NAME == nodename and
+		   LAST_NODE_TYPE == nodetype then
 			LAST_DRAG_INFO = nil
+			LAST_NODE_NAME = nil
+			LAST_NODE_TYPE = nil
 			return
 		end
 
 		LAST_DRAG_INFO = draginfo
+		LAST_NODE_NAME = nodename
+		LAST_NODE_TYPE = nodetype
 	end
 
 	local rSource = ActionsManager.decodeActors(draginfo)
