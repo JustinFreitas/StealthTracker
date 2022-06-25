@@ -68,8 +68,14 @@ function onInit()
 		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
-		CombatManager_onDrop = CombatManager.onDrop
-		CombatManager.onDrop = onDrop
+		if CombatDropManager then
+			CombatManager_onDrop = CombatDropManager.onLegacyDropEvent
+			CombatDropManager.onLegacyDropEvent = onDrop
+		else
+			CombatManager_onDrop = CombatManager.onDrop
+			CombatManager.onDrop = onDrop
+		end
+
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
 
