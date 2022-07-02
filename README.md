@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.6.2 by Justin Freitas
+StealthTracker v3.6.4 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -56,5 +56,6 @@ Changelist:
 - v3.6.1 - I ripped out the expiration of stealth on cast.  Spell casts that have attack rolls will still work as those are attacks already.  Any spell that is a save could be argued either way so I'll leave expiration in those cases up to the DM.
 - v3.6.2 - Fix for the broadcast from client to server with unrecognized message error.
 - v3.6.3 - Minor fixes, including announce text shortening.  onDrop override instead of onCustomDrop with fix for FGC double fire.
+- v3.6.4 - Adjustments to account for new FGU CT drop mechanism.  Changes to the FG version check.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
