@@ -449,7 +449,6 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     rStealthData.unaware = {} -- unaware of the current actor
 
     if not nodeCTSource then return rStealthData end
-	-- TODO: getActorDebilitatingCondition(nodeCTSource)??  Prolly needed onTurnStartEvent() to point out that stealthing or whatever isn't possible.
 
 	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
 	if not rCurrentActor then return rStealthData end
@@ -459,9 +458,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
 	if nStealthSource == nil then return rStealthData end
 
-
-    -- Loop through the CT
-	-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
+	-- Loop through the CT, getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
         if isValidCTNode(nodeCT) then  -- hasValidType(nodeCT) or isFriend(nodeCT)
@@ -482,19 +479,20 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     end
 
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
-                    local sText = string.format("'%s' - ", sIterationActorDisplayName)
-                    local sPPText = string.format("PP: %d", getPassivePerceptionNumber(rIterationActor))
+                    local sText = string.format("'%s'", sIterationActorDisplayName)
+                    local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
+                    local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
                     if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
                         if sDebilitatingCondition == nil then
                             table.insert(rStealthData.aware, sText .. sPPText)
                         else
-                            table.insert(rStealthData.unaware, sText .. "Condition: " .. sDebilitatingCondition)
+                            table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
                         end
                     else
                         if sDebilitatingCondition == nil then
                             table.insert(rStealthData.unaware, sText .. sPPText)
                         else
-                            table.insert(rStealthData.unaware, sText .. "Condition: " .. sDebilitatingCondition)
+                            table.insert(rStealthData.unaware, sText .. sConditionText)
                         end
                     end
                 end
