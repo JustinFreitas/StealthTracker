@@ -481,17 +481,18 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
                     local sText = string.format("'%s'", sIterationActorDisplayName)
                     local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
-                    local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
                     if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
                         if sDebilitatingCondition == nil then
                             table.insert(rStealthData.aware, sText .. sPPText)
                         else
+                            local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
                             table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
                         end
                     else
                         if sDebilitatingCondition == nil then
                             table.insert(rStealthData.unaware, sText .. sPPText)
                         else
+                            local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
                             table.insert(rStealthData.unaware, sText .. sConditionText)
                         end
                     end
