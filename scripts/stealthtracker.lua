@@ -479,18 +479,19 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     if nStealthSource ~= nil then
                         local sText = string.format("'%s'", sIterationActorDisplayName)
                         local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
+                        local sConditionFormat = " - Condition: %s"
                         if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
                             if sDebilitatingCondition == nil then
                                 table.insert(rStealthData.aware, sText .. sPPText)
                             else
-                                local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
+                                local sConditionText = string.format(sConditionFormat, sDebilitatingCondition)
                                 table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
                             end
                         else
                             if sDebilitatingCondition == nil then
                                 table.insert(rStealthData.unaware, sText .. sPPText)
                             else
-                                local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
+                                local sConditionText = string.format(sConditionFormat, sDebilitatingCondition)
                                 table.insert(rStealthData.unaware, sText .. sConditionText)
                             end
                         end
