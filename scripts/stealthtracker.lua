@@ -6,6 +6,7 @@
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
 ALL = "all"
+AWARE = "aware"
 DEXTERITY = "dexterity"
 EFFECTS = "effects"
 FORCE_DISPLAY = true
@@ -27,11 +28,13 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
+STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
 STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
+UNAWARE = "unaware"
 USER_ISHOST = false
 
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
@@ -50,6 +53,7 @@ function onInit()
 	local option_header = "option_header_STEALTHTRACKER"
 	local option_val_none = "option_val_none_STEALTHTRACKER"
 	local option_val_off = "option_val_off"
+    local both = "both"
 	local standard = "standard"
 
 	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
@@ -62,6 +66,8 @@ function onInit()
 		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
 	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
 		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
+    OptionsManager.registerOption2(STEALTHTRACKER_AWARE, false, option_header, "option_label_STEALTHTRACKER_AWARE", option_entry_cycler,
+		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = AWARE .. "|" .. UNAWARE, default = both })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -513,36 +519,40 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 		end
 	end
 
-    if #rStealthData.aware > 0 then
-		-- Now, let's display a summary message and append the output strings from above appended to the end.
-		local sText = string.format("'%s' (%s: %d) is seen by:\r%s",
-                                    sCTSourceDisplayName,
-									LOCALIZED_STEALTH,
-									nStealthSource,
-									table.concat(rStealthData.aware, "\r"))
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-    else
-		if nStealthSource ~= nil and checkVerbosityMax() then
-			local sText = string.format("There are no actors that can see '%s'.",
-                                        sCTSourceDisplayName)
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-		end
+    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
+        if #rStealthData.aware > 0 then
+            -- Now, let's display a summary message and append the output strings from above appended to the end.
+            local sText = string.format("'%s' (%s: %d) is seen by:\r%s",
+                                        sCTSourceDisplayName,
+                                        LOCALIZED_STEALTH,
+                                        nStealthSource,
+                                        table.concat(rStealthData.aware, "\r"))
+            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+        else
+            if nStealthSource ~= nil and checkVerbosityMax() then
+                local sText = string.format("There are no actors that can see '%s'.",
+                                            sCTSourceDisplayName)
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            end
+        end
     end
 
-    if #rStealthData.unaware > 0 then
-		-- Now, let's display a summary message and append the output strings from above appended to the end.
-		local sText = string.format("'%s' (%s: %d) is hidden from:\r%s",
-                                    sCTSourceDisplayName,
-                                    LOCALIZED_STEALTH,
-                                    nStealthSource,
-                                    table.concat(rStealthData.unaware, "\r"))
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-    else
-		if nStealthSource ~= nil and checkVerbosityMax() then
-			local sText = string.format("There are no actors unaware of '%s'.",
-                                        sCTSourceDisplayName)
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-		end
+    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, AWARE) then
+        if #rStealthData.unaware > 0 then
+            -- Now, let's display a summary message and append the output strings from above appended to the end.
+            local sText = string.format("'%s' (%s: %d) is hidden from:\r%s",
+                                        sCTSourceDisplayName,
+                                        LOCALIZED_STEALTH,
+                                        nStealthSource,
+                                        table.concat(rStealthData.unaware, "\r"))
+            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+        else
+            if nStealthSource ~= nil and checkVerbosityMax() then
+                local sText = string.format("There are no actors unaware of '%s'.",
+                                            sCTSourceDisplayName)
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            end
+        end
     end
 
     return rStealthData
