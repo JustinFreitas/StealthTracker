@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="StealthTracker v3.6.4 FGC/FGU 5E, 6/25/22\r2016-2022 Justin Freitas" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.7 FGC/FGU 5E, 10/31/22\r2016-2022 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.6.4</version>
+		<version>3.7</version>
 		<loadorder>999</loadorder>
 		<author>Justin Freitas</author>
-		<description>Stealth tracking via effect with related information regarding hidden and unaware actors.</description>
+		<description>Stealth tracking via effects in the Combat Tracker with related information regarding the hiding actor and who can and cannot see them.</description>
 		<ruleset>
 			<name>5E</name>
 		</ruleset>
