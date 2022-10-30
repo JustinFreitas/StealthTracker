@@ -454,10 +454,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
-
-	local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
-	if nStealthSource == nil then return rStealthData end
-
+    local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
 	-- Loop through the CT, getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
@@ -479,21 +476,23 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     end
 
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
-                    local sText = string.format("'%s'", sIterationActorDisplayName)
-                    local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
-                    if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
-                        if sDebilitatingCondition == nil then
-                            table.insert(rStealthData.aware, sText .. sPPText)
+                    if nStealthSource ~= nil then
+                        local sText = string.format("'%s'", sIterationActorDisplayName)
+                        local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
+                        if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
+                            if sDebilitatingCondition == nil then
+                                table.insert(rStealthData.aware, sText .. sPPText)
+                            else
+                                local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
+                                table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
+                            end
                         else
-                            local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
-                            table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
-                        end
-                    else
-                        if sDebilitatingCondition == nil then
-                            table.insert(rStealthData.unaware, sText .. sPPText)
-                        else
-                            local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
-                            table.insert(rStealthData.unaware, sText .. sConditionText)
+                            if sDebilitatingCondition == nil then
+                                table.insert(rStealthData.unaware, sText .. sPPText)
+                            else
+                                local sConditionText = string.format(" - Condition: %s", sDebilitatingCondition)
+                                table.insert(rStealthData.unaware, sText .. sConditionText)
+                            end
                         end
                     end
                 end
@@ -526,7 +525,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 									table.concat(rStealthData.aware, "\r"))
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
     else
-		if checkVerbosityMax() then
+		if nStealthSource ~= nil and checkVerbosityMax() then
 			local sText = string.format("There are no actors that can see '%s'.",
                                         sCTSourceDisplayName)
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
@@ -542,7 +541,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                                     table.concat(rStealthData.unaware, "\r"))
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
     else
-		if checkVerbosityMax() then
+		if nStealthSource ~= nil and checkVerbosityMax() then
 			local sText = string.format("There are no actors unaware of '%s'.",
                                         sCTSourceDisplayName)
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
