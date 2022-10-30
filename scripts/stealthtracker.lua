@@ -6,6 +6,7 @@
 -- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
 
 ALL = "all"
+AWARE = "aware"
 DEXTERITY = "dexterity"
 EFFECTS = "effects"
 FORCE_DISPLAY = true
@@ -27,11 +28,13 @@ OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
 SECRET = true
 ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
 STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
+STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
 STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
+UNAWARE = "unaware"
 USER_ISHOST = false
 
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
@@ -50,6 +53,7 @@ function onInit()
 	local option_header = "option_header_STEALTHTRACKER"
 	local option_val_none = "option_val_none_STEALTHTRACKER"
 	local option_val_off = "option_val_off"
+    local both = "both"
 	local standard = "standard"
 
 	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
@@ -62,6 +66,8 @@ function onInit()
 		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
 	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
 		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
+    OptionsManager.registerOption2(STEALTHTRACKER_AWARE, false, option_header, "option_label_STEALTHTRACKER_AWARE", option_entry_cycler,
+		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = AWARE .. "|" .. UNAWARE, default = both })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -177,7 +183,7 @@ end
 
 -- Puts a message in chat that is broadcast to everyone attached to the host (including the host) if bSecret is true, otherwise local only.
 function displayChatMessage(sFormattedText, bSecret)
-	if not sFormattedText then return end
+	if sFormattedText == nil then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
@@ -200,7 +206,7 @@ end
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).
 function displayProcessAttackFromStealth(rSource, rTarget)
 	-- if no source or no roll then exit, skipping StealthTracker processing.
-	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
+	if not rSource or rSource.sCTNode == nil or rSource.sCTNode == "" then return end
 
 	-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
 	local nodeSourceCT = ActorManager.getCTNode(rSource)
@@ -222,13 +228,7 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	end
 
 	local aOutput = {}
-	if not rTarget then
-		if checkVerbosityMax() then
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "No attack target!")
-		end
-
-		getFormattedHiddenAndUnawareTargetsWithTotal(nodeSourceCT, aOutput)
-	else
+	if rTarget then
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
 			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
@@ -245,6 +245,13 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 		if nStealthSource then
 			getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
 		end
+	else
+        -- Check them all
+		if checkVerbosityMax() then
+			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "No attack target!")
+		end
+
+		getFormattedStealthDataFromCT(nodeSourceCT, aOutput)
 	end
 
 	expireStealthEffectOnCTNode(rSource, aOutput)
@@ -273,7 +280,7 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 end
 
 function displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, bForce)
-	-- Check to make sure the CT actor is conscious.  Unconscious actors should not be assessed.
+	-- Check to make sure the CT actor is conscious.  Unconscious/stunned/whatever actors should not be assessed.
 	local sCondition = getActorDebilitatingCondition(nodeCT)
 	if sCondition then
 		displayDebilitatingConditionChatMessage(nodeCT, sCondition, bForce)
@@ -281,13 +288,7 @@ function displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, bFo
 	end
 
 	local aOutput = {}
-	local nCount = getFormattedHiddenAndUnawareTargetsWithTotal(nodeCT, aOutput)
-	if nCount == 0 and (bForce or checkVerbosityMax()) then
-		local sText = string.format("No hidden or unaware actors to '%s'.", ActorManager.getDisplayName(nodeCT))
-		displayChatMessage(sText, SECRET)
-		return
-	end
-
+	getFormattedStealthDataFromCT(nodeCT, aOutput)
 	displayTableIfNonEmpty(aOutput, bForce)
 end
 
@@ -309,7 +310,7 @@ end
 
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
 function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
-	if not nAttackerStealth or not rTarget then return false end
+	if nAttackerStealth == nil or not rTarget then return false end
 
 	local nPPTarget = getPassivePerceptionNumber(rTarget)
 	return nPPTarget ~= nil and nPPTarget >= nAttackerStealth
@@ -347,17 +348,12 @@ end
 function expireStealthEffectOnCTNode(rActor, aOutput)
 	if not rActor then return end
 
-	aOutput = validateTableOrNew(aOutput)
 	local nodeCT = ActorManager.getCTNode(rActor)
 	if not nodeCT then return end
 
-	local aSortedCTNodes = getOrderedEffectsTableFromCTNode(nodeCT)
-	if not aSortedCTNodes then return end
-
 	local nodeLastEffectWithStealth
-
 	-- Walk the effects in order so that the last one added is taken in case they are stacked.
-	for _, nodeEffect in pairs(aSortedCTNodes) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		local sExtractedStealth = getStealthValueFromEffectNode(nodeEffect)
 		if sExtractedStealth then
 			nodeLastEffectWithStealth = nodeEffect
@@ -399,96 +395,7 @@ function getActorDebilitatingCondition(vActor)
 end
 
 function getDefaultPassivePerception(nodeCreature)
-	-- TODO: Include the Stealth proficiency for NPCs (PC is already accounted for) for this calculation (see manager_action_skill.lua).
-	return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom")
-end
-
--- Function to check, for a given CT node, which CT actors are hidden from it.
-function getFormattedActorsHiddenFromSource(nodeCTSource, aOutput)
-	if not nodeCTSource or getActorDebilitatingCondition(nodeCTSource) then return 0 end
-
-	aOutput = validateTableOrNew(aOutput)
-
-	-- getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset)
-	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
-	if not lCombatTrackerActors then return 0 end
-
-	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
-	if not rCurrentActor then return 0 end
-
-	local aHiddenFromSource = {}
-	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
-	for _, nodeCT in ipairs(lCombatTrackerActors) do
-		local rIterationActor = ActorManager.resolveActor(nodeCT)
-		-- Compare the CT node ID (unique) instead of the name to prevent duplicate friendly names causing problems.
-		if isValidCTNode(nodeCT) and
-			rIterationActor and
-			rCurrentActor.sCTNode ~= rIterationActor.sCTNode and
-			(not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
-			local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
-			if rHiddenTarget then
-				local sText = string.format("'%s' - %s: %d",
-											ActorManager.getDisplayName(rIterationActor),
-											LOCALIZED_STEALTH_ABV,
-											rHiddenTarget.stealth)
-				table.insert(aHiddenFromSource, sText)
-			end
-		end
-	end
-
-	if #aHiddenFromSource > 0 then
-		local sText = string.format("'%s' (PP: %d) does not perceive:\r%s",
-									ActorManager.getDisplayName(nodeCTSource),
-									getPassivePerceptionNumber(rCurrentActor),
-									table.concat(aHiddenFromSource, "\r"))
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-	else
-		if checkVerbosityMax() then
-			local sText = string.format("There are no actors hidden from '%s'.",
-										ActorManager.getDisplayName(nodeCTSource))
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-		end
-	end
-
-	return #aHiddenFromSource
-end
-
--- Function to display as a local chat message (not broadcast) the potentially unaware targets of an attacker that is stealthing, which might mean the attacker could take advantage on the roll.
-function getFormattedActorsUnawareOfSource(rSource, nStealthSource, aUnawareTargets, aOutput)
-	if not rSource or not nStealthSource or not aUnawareTargets then return end
-
-	-- First, let's build a new table that has the strings as they are to be output in chat.
-	local aUnawareActorNamesAndPP = {}
-	for _, rActor in ipairs(aUnawareTargets) do
-		if rActor then
-			local sCondition = getActorDebilitatingCondition(rActor)
-			local nPPActor = getPassivePerceptionNumber(rActor)
-			if nPPActor ~= nil and
-			   not sCondition and
-			   (not checkFactionFilter() or isDifferentFaction(rSource, rActor)) then
-				table.insert(aUnawareActorNamesAndPP, string.format("'%s' - PP: %d",
-																	ActorManager.getDisplayName(rActor),
-																	nPPActor))
-			end
-		end
-	end
-
-	local sChatMessage
-	if #aUnawareActorNamesAndPP > 0 then
-		-- Now, let's display a summary message and append the output strings from above appended to the end.
-		sChatMessage = string.format("'%s' (%s: %d) is hidden from:\r%s",
-									 ActorManager.getDisplayName(rSource),
-									 LOCALIZED_STEALTH_ABV,
-									 nStealthSource,
-									 table.concat(aUnawareActorNamesAndPP, "\r"))
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sChatMessage)
-	else
-		if checkVerbosityMax() then
-			sChatMessage = string.format("There are no actors unaware of '%s'.",
-										 ActorManager.getDisplayName(rSource))
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sChatMessage)
-		end
-	end
+    return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
@@ -507,20 +414,10 @@ function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
 	insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
 end
 
-function getFormattedHiddenAndUnawareTargetsWithTotal(nodeActorCT, aOutput)
-	aOutput = validateTableOrNew(aOutput)
-
-	-- Do the GM only display of the actors that are hidden from the current actor.
-	local nCountHidden = getFormattedActorsHiddenFromSource(nodeActorCT, aOutput)
-	-- Do the host-only (because this handler is wired for host only) local display of CT actors that might be caught off guard by a stealthing attacker.
-	local nCountUnaware = getFormattedUnawareTargets(nodeActorCT, aOutput)
-	return nCountHidden + nCountUnaware
-end
-
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 -- This is called from the host only.
 function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
-	if not rSource or not rTarget or not nStealthSource then return end
+	if not rSource or not rTarget or nStealthSource == nil then return end
 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
@@ -547,29 +444,118 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 	end
 end
 
-function getFormattedUnawareTargets(nodeActiveCT, aOutput)
-	if not nodeActiveCT then return 0 end
+function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
+    local rStealthData = {}
+    rStealthData.hidden = {} -- hidden from current actor
+    rStealthData.aware = {} -- aware of the current actor
+    rStealthData.unaware = {} -- unaware of the current actor
 
-	local rSource = ActorManager.resolveActor(nodeActiveCT)
-	if not rSource then return 0 end
+    if not nodeCTSource then return rStealthData end
 
-	local nStealthSource = getStealthNumberFromEffects(nodeActiveCT)
-	if not nStealthSource then return 0 end
+	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
+	if not rCurrentActor then return rStealthData end
 
-	local aUnawareTargets = getUnawareCTTargetsGivenSource(rSource)
-	getFormattedActorsUnawareOfSource(rSource, nStealthSource, aUnawareTargets, aOutput)
-	return #aUnawareTargets
-end
+    local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
+    local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
+	-- Loop through the CT, getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
+	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
+	for _, nodeCT in ipairs(lCombatTrackerActors) do
+        if isValidCTNode(nodeCT) then  -- hasValidType(nodeCT) or isFriend(nodeCT)
+            -- Two checks will be needed each iteration.  One for hidden and the other for aware/unaware.
+            local rIterationActor = ActorManager.resolveActor(nodeCT)
+            if rIterationActor then
+                local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
+                local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
+                if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
+                   (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
+                    local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
+                    if rHiddenTarget and sDebilitatingCondition == nil then
+                        local sText = string.format("'%s' - %s: %d", -- 'ActorName' - Stealth: 8
+                                                    sIterationActorDisplayName,
+                                                    LOCALIZED_STEALTH,
+                                                    rHiddenTarget.stealth)
+                        table.insert(rStealthData.hidden, sText)
+                    end
 
--- For the provided CT node, get an ordered list (in order that they were added) of the effects on it.
-function getOrderedEffectsTableFromCTNode(nodeCT)
-	local aCTNodes = {}
-	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
-		table.insert(aCTNodes, nodeEffect)
+                    -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
+                    if nStealthSource ~= nil then
+                        local sText = string.format("'%s'", sIterationActorDisplayName)
+                        local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
+                        local sConditionFormat = " - Condition: %s"
+                        if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
+                            if sDebilitatingCondition == nil then
+                                table.insert(rStealthData.aware, sText .. sPPText)
+                            else
+                                local sConditionText = string.format(sConditionFormat, sDebilitatingCondition)
+                                table.insert(rStealthData.unaware, sText .. sPPText .. sConditionText)
+                            end
+                        else
+                            if sDebilitatingCondition == nil then
+                                table.insert(rStealthData.unaware, sText .. sPPText)
+                            else
+                                local sConditionText = string.format(sConditionFormat, sDebilitatingCondition)
+                                table.insert(rStealthData.unaware, sText .. sConditionText)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Data consolidation section for output table
+    aOutput = validateTableOrNew(aOutput)
+	if #rStealthData.hidden > 0 then
+		local sText = string.format("'%s' (PP: %d) does not perceive:\r%s",
+                                    sCTSourceDisplayName,
+									getPassivePerceptionNumber(rCurrentActor),
+									table.concat(rStealthData.hidden, "\r"))
+		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+	else
+		if checkVerbosityMax() then
+			local sText = string.format("There are no actors hidden from '%s'.",
+                                        sCTSourceDisplayName)
+			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+		end
 	end
 
-	table.sort(aCTNodes, function (a, b) return a.getName() < b.getName() end)
-	return aCTNodes
+    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
+        if #rStealthData.aware > 0 then
+            -- Now, let's display a summary message and append the output strings from above appended to the end.
+            local sText = string.format("'%s' (%s: %d) is seen by:\r%s",
+                                        sCTSourceDisplayName,
+                                        LOCALIZED_STEALTH,
+                                        nStealthSource,
+                                        table.concat(rStealthData.aware, "\r"))
+            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+        else
+            if nStealthSource ~= nil and checkVerbosityMax() then
+                local sText = string.format("There are no actors that can see '%s'.",
+                                            sCTSourceDisplayName)
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            end
+        end
+    end
+
+    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, AWARE) then
+        if #rStealthData.unaware > 0 then
+            -- Now, let's display a summary message and append the output strings from above appended to the end.
+            local sText = string.format("'%s' (%s: %d) is hidden from:\r%s",
+                                        sCTSourceDisplayName,
+                                        LOCALIZED_STEALTH,
+                                        nStealthSource,
+                                        table.concat(rStealthData.unaware, "\r"))
+            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+        else
+            if nStealthSource ~= nil and checkVerbosityMax() then
+                local sText = string.format("There are no actors unaware of '%s'.",
+                                            sCTSourceDisplayName)
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            end
+        end
+    end
+
+    return rStealthData
 end
 
 -- This gets the Passive Perception number from the character sheet for pcs and ct node for npc.
@@ -591,22 +577,35 @@ function getPassivePerceptionNumber(rActor)
 
 	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort (for PCs/charsheet, it should use Perception Prof/Expertise if it's there).
 	-- Lua note: When used as control expression, the only false values in Lua are false and nil. Everything else is evaluated as true value (i.e. 0 is a true value because a value is present).
-	if not nPP then
+	if nPP == nil then
 		nPP = getDefaultPassivePerception(nodeCreature)
 	end
 
 	return nPP
 end
 
+function getProficiencyBonus(vActor)
+    local sNodeType, nodeActor = ActorManager.getTypeAndNode(vActor);
+    local nStatScore
+    if sNodeType == "pc" then
+        nStatScore = DB.getValue(nodeActor, "profbonus", 0);
+    else
+        local nCR = tonumber(DB.getValue(nodeActor, "cr", ""):match("^%d+$")) or 0;
+        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2); -- Formula for the CR to prof bonus chart.  From FG 5e ruleset.
+    end
+
+    return nStatScore
+end
+
 -- Function that walks the effects for a given CT node and extracts the last 'Stealth: X' effect stealth value.
 function getStealthNumberFromEffects(nodeCT)
-	if not nodeCT then return end
+	if not nodeCT then return nil end
 
 	local nStealth
-	local aSorted = getOrderedEffectsTableFromCTNode(nodeCT)
+	local aEffects = DB.getChildren(nodeCT, EFFECTS)
 
 	-- Walk the effects in order so that the last one added is taken in case they are stacked.  If a duplicate Stealth effect is found, remove subsequent ones.
-	for _, nodeEffect in pairs(aSorted) do
+	for _, nodeEffect in pairs(aEffects) do
 		local sExtractedStealth = getStealthValueFromEffectNode(nodeEffect)
 		if sExtractedStealth then
 			nStealth = tonumber(sExtractedStealth)
@@ -638,28 +637,6 @@ function getStealthValueFromEffectNode(nodeEffect)
 	return sExtractedStealth
 end
 
--- Function to build a table of Actors that are unaware of the stealthing attacker.
-function getUnawareCTTargetsGivenSource(rSource)
-	-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
-	local nodeSourceCT = ActorManager.getCTNode(rSource)
-	if not nodeSourceCT then return end
-
-	local nStealthSource = getStealthNumberFromEffects(nodeSourceCT)
-	local aUnawareTargets = {}
-	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
-	if not lCombatTrackerActors then return end
-
-	-- NOTE: _ is used as a placeholder in Lua for unused variables (in this case, the key).
-	for _, nodeCT in ipairs(lCombatTrackerActors) do
-		local rTarget = ActorManager.resolveActor(nodeCT)
-		if isValidCTNode(nodeCT) and not isTargetHiddenFromSource(rSource, rTarget) and not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
-			table.insert(aUnawareTargets, rTarget)
-		end
-	end
-
-	return aUnawareTargets
-end
-
 -- Handler for the message to do an attack from a position of stealth.
 function handleAttackFromStealth(msgOOB)
 	displayProcessAttackFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode), ActorManager.resolveActor(msgOOB.sTargetCTNode))
@@ -667,11 +644,11 @@ end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
 function handleUpdateStealth(msgOOB)
-	if not msgOOB or not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
+	if not msgOOB or msgOOB.nStealthTotal == nil or msgOOB.sCTNodeId == nil or not msgOOB.user then return end
 
 	-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 	local nStealthTotal = tonumber(msgOOB.nStealthTotal)
-	if not nStealthTotal then return end
+	if nStealthTotal == nil then return end
 
 	if checkAndDisplayAllowOutOfCombatAndTurnChecks(msgOOB.sCTNodeId) then
 		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
@@ -752,7 +729,7 @@ end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
 function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
-	if not sSourceCTNode or not sTargetCTNode then return end
+	if sSourceCTNode == nil or sTargetCTNode == nil then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
@@ -766,7 +743,7 @@ end
 
 -- Function to notify the host of a stealth update request.  The arguments are the CT node identifier and the stealth total number.
 function notifyUpdateStealth(sCTNodeId, nStealthTotal)
-	if not sCTNodeId or not nStealthTotal then return end
+	if sCTNodeId == nil or nStealthTotal == nil then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
@@ -818,7 +795,7 @@ function onDropEvent(rSource, rTarget, draginfo)
 	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return end
 
 	local sDragInfoData = draginfo.getStringData()
-	if not sDragInfoData or sDragInfoData == "" then return end
+	if sDragInfoData == nil or sDragInfoData == "" then return end
 
 	-- If the dropped item was a stealth roll or dex check, update the target creature node with the stealth value.
 	local nStealthValue = draginfo.getNumberData()
@@ -916,7 +893,7 @@ end
 
 -- Function to encapsulate the setting of the name with stealth value.
 function setNodeWithStealthValue(sCTNode, nStealthTotal)
-	if not sCTNode or not nStealthTotal then return end
+	if sCTNode == nil or nStealthTotal == nil then return end
 
 	-- First, delete any existing Stealth effects on the CT node.
 	local nodeCT = ActorManager.getCTNode(sCTNode)
