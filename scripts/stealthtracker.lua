@@ -274,14 +274,13 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 end
 
 function displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, bForce)
-	-- Check to make sure the CT actor is conscious.  Unconscious actors should not be assessed.
+	-- Check to make sure the CT actor is conscious.  Unconscious/stunned/whatever actors should not be assessed.
 	local sCondition = getActorDebilitatingCondition(nodeCT)
 	if sCondition then
 		displayDebilitatingConditionChatMessage(nodeCT, sCondition, bForce)
 		return
 	end
 
-    -- TODO: Much like this, a user requested we show the actors that can SEE THE STEALTHING ACTOR.  Make it a tri-state switch:  seen/unseen/both
 	local aOutput = {}
 	getFormattedStealthDataFromCT(nodeCT, aOutput)
 	displayTableIfNonEmpty(aOutput, bForce)
@@ -397,15 +396,60 @@ function getDefaultPassivePerception(nodeCreature)
 	return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom")
 end
 
--- TODO: Sort
+-- Function that walks the CT nodes and deletes the stealth effects from them.
+function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+	aOutput = validateTableOrNew(aOutput)
+	if checkAllowOutOfCombat() then
+		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "Out of combat Stealth is allowed in the options. Leaving CT stealth effects after reset.")
+		return
+	end
+
+	-- Walk the CT resetting all names.
+	for _, nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
+		deleteAllStealthEffects(nodeCT)
+	end
+
+	insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
+end
+
+-- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
+-- This is called from the host only.
+function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
+	if not rSource or not rTarget or not nStealthSource then return end
+
+	aOutput = validateTableOrNew(aOutput)
+	local sMsgText
+	if not isTargetHiddenFromSource(rSource, rTarget) then
+		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
+									 ActorManager.getDisplayName(rSource),
+									 LOCALIZED_STEALTH_ABV,
+									 nStealthSource,
+									 ActorManager.getDisplayName(rTarget),
+									 getPassivePerceptionNumber(rTarget))
+		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
+			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
+		elseif checkVerbosityMax() then
+			-- Target sees the attack coming.  Build appropriate message.
+			sMsgText = string.format("Attacker not hidden. %s", sStats)
+		else
+			sMsgText = nil
+		end
+
+		if sMsgText then
+			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
+		end
+	end
+end
+
 function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     local rStealthData = {}
-    rStealthData["hidden"] = {} -- hidden from current actor
-    --rStealthData.hidden = {} -- hidden from current actor
-    rStealthData["aware"] = {} -- aware of the current actor
-    --rStealthData.aware = {} -- aware of the current actor
-    rStealthData["unaware"] = {} -- unaware of the current actor
-    --rStealthData.unaware = {} -- unaware of the current actor
+    --rStealthData["hidden"] = {} -- hidden from current actor
+    rStealthData.hidden = {} -- hidden from current actor
+    --rStealthData["aware"] = {} -- aware of the current actor
+    rStealthData.aware = {} -- aware of the current actor
+    --rStealthData["unaware"] = {} -- unaware of the current actor
+    rStealthData.unaware = {} -- unaware of the current actor
 
     if not nodeCTSource then return rStealthData end
 	-- TODO: getActorDebilitatingCondition(nodeCTSource)??  Prolly needed onTurnStartEvent() to point out that stealthing or whatever isn't possible.
@@ -461,7 +505,6 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
         end
     end
 
-    -- TODO: Do all proper option filtering here, including the older verbosity options.
     -- Data consolidation section for output table
     aOutput = validateTableOrNew(aOutput)
 	if #rStealthData.hidden > 0 then
@@ -511,52 +554,6 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     end
 
     return rStealthData
-end
-
--- Function that walks the CT nodes and deletes the stealth effects from them.
-function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
-	aOutput = validateTableOrNew(aOutput)
-	if checkAllowOutOfCombat() then
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "Out of combat Stealth is allowed in the options. Leaving CT stealth effects after reset.")
-		return
-	end
-
-	-- Walk the CT resetting all names.
-	for _, nodeCT in pairs(DB.getChildren(CombatManager.CT_LIST)) do
-		deleteAllStealthEffects(nodeCT)
-	end
-
-	insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "All Stealth effects deleted on combat reset.")
-end
-
--- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
--- This is called from the host only.
-function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
-	if not rSource or not rTarget or not nStealthSource then return end
-
-	aOutput = validateTableOrNew(aOutput)
-	local sMsgText
-	if not isTargetHiddenFromSource(rSource, rTarget) then
-		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
-									 ActorManager.getDisplayName(rSource),
-									 LOCALIZED_STEALTH_ABV,
-									 nStealthSource,
-									 ActorManager.getDisplayName(rTarget),
-									 getPassivePerceptionNumber(rTarget))
-		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
-			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
-		elseif checkVerbosityMax() then
-			-- Target sees the attack coming.  Build appropriate message.
-			sMsgText = string.format("Attacker not hidden. %s", sStats)
-		else
-			sMsgText = nil
-		end
-
-		if sMsgText then
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-		end
-	end
 end
 
 -- This gets the Passive Perception number from the character sheet for pcs and ct node for npc.
