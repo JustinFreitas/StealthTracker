@@ -177,7 +177,7 @@ end
 
 -- Puts a message in chat that is broadcast to everyone attached to the host (including the host) if bSecret is true, otherwise local only.
 function displayChatMessage(sFormattedText, bSecret)
-	if not sFormattedText then return end
+	if sFormattedText == nil then return end
 
 	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
@@ -200,7 +200,7 @@ end
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).
 function displayProcessAttackFromStealth(rSource, rTarget)
 	-- if no source or no roll then exit, skipping StealthTracker processing.
-	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
+	if not rSource or rSource.sCTNode == nil or rSource.sCTNode == "" then return end
 
 	-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
 	local nodeSourceCT = ActorManager.getCTNode(rSource)
@@ -415,7 +415,7 @@ end
 -- Function to do the 'attack from stealth' comparison where the attacker could have advantage if the target doesn't perceive the attacker (chat msg displayed).
 -- This is called from the host only.
 function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, aOutput)
-	if not rSource or not rTarget or not nStealthSource then return end
+	if not rSource or not rTarget or nStealthSource == nil then return end
 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
@@ -572,7 +572,7 @@ function getPassivePerceptionNumber(rActor)
 
 	-- Calculation of passive perception from the wisdom modifier is same for pc/npc and should be used as a last resort (for PCs/charsheet, it should use Perception Prof/Expertise if it's there).
 	-- Lua note: When used as control expression, the only false values in Lua are false and nil. Everything else is evaluated as true value (i.e. 0 is a true value because a value is present).
-	if not nPP then
+	if nPP == nil then
 		nPP = getDefaultPassivePerception(nodeCreature)
 	end
 
@@ -626,11 +626,11 @@ end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
 function handleUpdateStealth(msgOOB)
-	if not msgOOB or not msgOOB.nStealthTotal or not msgOOB.sCTNodeId or not msgOOB.user then return end
+	if not msgOOB or msgOOB.nStealthTotal == nil or msgOOB.sCTNodeId == nil or not msgOOB.user then return end
 
 	-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 	local nStealthTotal = tonumber(msgOOB.nStealthTotal)
-	if not nStealthTotal then return end
+	if nStealthTotal == nil then return end
 
 	if checkAndDisplayAllowOutOfCombatAndTurnChecks(msgOOB.sCTNodeId) then
 		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
@@ -711,7 +711,7 @@ end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
 function notifyAttackFromStealth(sSourceCTNode, sTargetCTNode)
-	if not sSourceCTNode or not sTargetCTNode then return end
+	if sSourceCTNode == nil or sTargetCTNode == nil then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
@@ -725,7 +725,7 @@ end
 
 -- Function to notify the host of a stealth update request.  The arguments are the CT node identifier and the stealth total number.
 function notifyUpdateStealth(sCTNodeId, nStealthTotal)
-	if not sCTNodeId or not nStealthTotal then return end
+	if sCTNodeId == nil or nStealthTotal == nil then return end
 
 	-- Setup the OOB message object, including the required type.
 	local msgOOB = {}
@@ -777,7 +777,7 @@ function onDropEvent(rSource, rTarget, draginfo)
 	if rSource or not USER_ISHOST or not rTarget or not rTarget.sCTNode or not draginfo then return end
 
 	local sDragInfoData = draginfo.getStringData()
-	if not sDragInfoData or sDragInfoData == "" then return end
+	if sDragInfoData == nil or sDragInfoData == "" then return end
 
 	-- If the dropped item was a stealth roll or dex check, update the target creature node with the stealth value.
 	local nStealthValue = draginfo.getNumberData()
@@ -875,7 +875,7 @@ end
 
 -- Function to encapsulate the setting of the name with stealth value.
 function setNodeWithStealthValue(sCTNode, nStealthTotal)
-	if not sCTNode or not nStealthTotal then return end
+	if sCTNode == nil or nStealthTotal == nil then return end
 
 	-- First, delete any existing Stealth effects on the CT node.
 	local nodeCT = ActorManager.getCTNode(sCTNode)
