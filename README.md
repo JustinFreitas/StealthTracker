@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.6.4 by Justin Freitas
+StealthTracker v3.7 by Justin Freitas
 
 ReadMe and Usage Notes
 
