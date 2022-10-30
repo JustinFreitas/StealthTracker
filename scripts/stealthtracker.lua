@@ -591,7 +591,7 @@ function getProficiencyBonus(vActor)
         nStatScore = DB.getValue(nodeActor, "profbonus", 0);
     else
         local nCR = tonumber(DB.getValue(nodeActor, "cr", ""):match("^%d+$")) or 0;
-        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2);
+        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2); -- Formula for the CR to prof bonus chart.  From FG 5e ruleset.
     end
 
     return nStatScore
