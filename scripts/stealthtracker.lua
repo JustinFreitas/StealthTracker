@@ -444,11 +444,8 @@ end
 
 function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     local rStealthData = {}
-    --rStealthData["hidden"] = {} -- hidden from current actor
     rStealthData.hidden = {} -- hidden from current actor
-    --rStealthData["aware"] = {} -- aware of the current actor
     rStealthData.aware = {} -- aware of the current actor
-    --rStealthData["unaware"] = {} -- unaware of the current actor
     rStealthData.unaware = {} -- unaware of the current actor
 
     if not nodeCTSource then return rStealthData end
@@ -472,10 +469,11 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
+                local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
                 if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
                     local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
-                    if rHiddenTarget then
+                    if rHiddenTarget and sDebilitatingCondition == nil then
                         local sText = string.format("'%s' - %s: %d", -- 'ActorName' - Stealth: 8
                                                     sIterationActorDisplayName,
                                                     LOCALIZED_STEALTH,
@@ -486,7 +484,6 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
                     local sText = string.format("'%s' - ", sIterationActorDisplayName)
                     local sPPText = string.format("PP: %d", getPassivePerceptionNumber(rIterationActor))
-                    local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
                     if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
                         if sDebilitatingCondition == nil then
                             table.insert(rStealthData.aware, sText .. sPPText)
