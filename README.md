@@ -57,6 +57,6 @@ Changelist:
 - v3.6.2 - Fix for the broadcast from client to server with unrecognized message error.
 - v3.6.3 - Minor fixes, including announce text shortening.  onDrop override instead of onCustomDrop with fix for FGC double fire.
 - v3.6.4 - Adjustments to account for new FGU CT drop mechanism.  Changes to the FG version check.
-- v3.7 - Added in a user request (special thanks to Tooting Dog) to show aware actors along with hidden and unaware when doing the check against an actors stealth (like in the summary on turn start).  Through this, I've rewritten that portion of the code to be more optimal.  Fixed a bunch of minor issues.  I've added prof bonus that was missing from the rare default PP calculation (when it's not available to grab from sheet).
+- v3.7 - Added in a user request (special thanks to Tooting Dog) to show aware actors along with hidden and unaware when doing the check against an actors stealth (like in the summary on turn start).  Through this, I've rewritten that portion of the code to be more optimal.  There is an option to tune the stealth summary for aware/unaware/both, defaulting to both.  Fixed a bunch of minor issues.  I've added prof bonus that was missing from the rare default PP calculation (when it's not available to grab from sheet).
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.jpg?raw=true)
