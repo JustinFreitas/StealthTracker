@@ -342,15 +342,12 @@ end
 function expireStealthEffectOnCTNode(rActor, aOutput)
 	if not rActor then return end
 
-	aOutput = validateTableOrNew(aOutput)
 	local nodeCT = ActorManager.getCTNode(rActor)
 	if not nodeCT then return end
 
-	local aSortedCTNodes = DB.getChildren(nodeCT, EFFECTS)
 	local nodeLastEffectWithStealth
-
 	-- Walk the effects in order so that the last one added is taken in case they are stacked.
-	for _, nodeEffect in pairs(aSortedCTNodes) do
+	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		local sExtractedStealth = getStealthValueFromEffectNode(nodeEffect)
 		if sExtractedStealth then
 			nodeLastEffectWithStealth = nodeEffect
@@ -392,8 +389,7 @@ function getActorDebilitatingCondition(vActor)
 end
 
 function getDefaultPassivePerception(nodeCreature)
-	-- TODO: Include the Stealth proficiency for NPCs (PC is already accounted for) for this calculation (see manager_action_skill.lua).
-	return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom")
+    return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
@@ -576,6 +572,19 @@ function getPassivePerceptionNumber(rActor)
 	end
 
 	return nPP
+end
+
+function getProficiencyBonus(vActor)
+    local sNodeType, nodeActor = ActorManager.getTypeAndNode(vActor);
+    local nStatScore
+    if sNodeType == "pc" then
+        nStatScore = DB.getValue(nodeActor, "profbonus", 0);
+    else
+        local nCR = tonumber(DB.getValue(nodeActor, "cr", ""):match("^%d+$")) or 0;
+        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2);
+    end
+
+    return nStatScore
 end
 
 -- Function that walks the effects for a given CT node and extracts the last 'Stealth: X' effect stealth value.
