@@ -197,7 +197,7 @@ end
 function displayDebilitatingConditionChatMessage(vActor, sCondition, bForce)
 	if not bForce and checkVerbosityOff() then return end
 
-	local sText = string.format("'%s' is %s, skipping StealthTracker processing.",
+	local sText = string.format("%s is %s, skipping StealthTracker processing.",
 								ActorManager.getDisplayName(vActor),
 								sCondition)
 	displayChatMessage(sText, SECRET)
@@ -231,7 +231,7 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	if rTarget then
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
 		if rHiddenTarget then
-			local sMsgText = string.format("Target hidden. Attack possible? ('%s' %s: %d, '%s' PP: %d).",
+			local sMsgText = string.format("Target hidden. Attack possible? (%s %s: %d, %s PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
 											rHiddenTarget.stealth,
@@ -364,7 +364,7 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 	if nodeLastEffectWithStealth then
 		if checkExpireNone() then
 			if checkVerbosityMax() then
-				local sText = string.format("'%s' took an attack from stealth that should expire the effect.",
+				local sText = string.format("%s took an attack from stealth that should expire the effect.",
 											ActorManager.getDisplayName(rActor))
 				insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 			end
@@ -422,7 +422,7 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
 	if not isTargetHiddenFromSource(rSource, rTarget) then
-		local sStats = string.format("('%s' %s: %d, '%s' PP: %d)",
+		local sStats = string.format("(%s %s: %d, %s PP: %d)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
 									 nStealthSource,
@@ -470,7 +470,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
                     local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
                     if rHiddenTarget and sDebilitatingCondition == nil then
-                        local sText = string.format("'%s' - %s: %d", -- 'ActorName' - Stealth: 8
+                        local sText = string.format("%s - %s: %d", -- 'ActorName' - Stealth: 8
                                                     sIterationActorDisplayName,
                                                     LOCALIZED_STEALTH,
                                                     rHiddenTarget.stealth)
@@ -479,7 +479,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
                     if nStealthSource ~= nil then
-                        local sText = string.format("'%s'", sIterationActorDisplayName)
+                        local sText = string.format("%s", sIterationActorDisplayName)
                         local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
                         local sConditionFormat = " - Condition: %s"
                         if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
@@ -506,14 +506,14 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     -- Data consolidation section for output table
     aOutput = validateTableOrNew(aOutput)
 	if #rStealthData.hidden > 0 then
-		local sText = string.format("'%s' (PP: %d) does not perceive:\r%s",
+		local sText = string.format("%s (PP: %d) does not perceive:\r%s",
                                     sCTSourceDisplayName,
 									getPassivePerceptionNumber(rCurrentActor),
 									table.concat(rStealthData.hidden, "\r"))
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 	else
 		if checkVerbosityMax() then
-			local sText = string.format("There are no actors hidden from '%s'.",
+			local sText = string.format("There are no actors hidden from %s.",
                                         sCTSourceDisplayName)
 			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 		end
@@ -522,7 +522,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
         if #rStealthData.aware > 0 then
             -- Now, let's display a summary message and append the output strings from above appended to the end.
-            local sText = string.format("'%s' (%s: %d) is seen by:\r%s",
+            local sText = string.format("%s (%s: %d) is seen by:\r%s",
                                         sCTSourceDisplayName,
                                         LOCALIZED_STEALTH,
                                         nStealthSource,
@@ -530,7 +530,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
         else
             if nStealthSource ~= nil and checkVerbosityMax() then
-                local sText = string.format("There are no actors that can see '%s'.",
+                local sText = string.format("There are no actors that can see %s.",
                                             sCTSourceDisplayName)
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
             end
@@ -540,7 +540,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     if not OptionsManager.isOption(STEALTHTRACKER_AWARE, AWARE) then
         if #rStealthData.unaware > 0 then
             -- Now, let's display a summary message and append the output strings from above appended to the end.
-            local sText = string.format("'%s' (%s: %d) is hidden from:\r%s",
+            local sText = string.format("%s (%s: %d) is hidden from:\r%s",
                                         sCTSourceDisplayName,
                                         LOCALIZED_STEALTH,
                                         nStealthSource,
@@ -548,7 +548,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
         else
             if nStealthSource ~= nil and checkVerbosityMax() then
-                local sText = string.format("There are no actors unaware of '%s'.",
+                local sText = string.format("There are no actors unaware of %s.",
                                             sCTSourceDisplayName)
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
             end
