@@ -1,6 +1,7 @@
 :: Assumes running from StealthTracker\build
 mkdir out\StealthTracker
 copy ..\extension.xml out\StealthTracker\
+copy ..\readme.txt out\StealthTracker\
 mkdir out\StealthTracker\scripts
 copy ..\scripts\stealthtracker.lua out\StealthTracker\scripts\
 mkdir out\StealthTracker\graphics\icons
