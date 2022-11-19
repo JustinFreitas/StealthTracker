@@ -32,6 +32,7 @@ STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
 STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
 STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
+STEALTHTRACKER_INIT_CLEAR = "STEALTHTRACKER_INIT_CLEAR"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
@@ -73,6 +74,8 @@ function onInit()
 		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_none_STEALTHTRACKER|option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = NONE .. "|" .. AWARE .. "|" .. UNAWARE, default = both })
     OptionsManager.registerOption2(STEALTHTRACKER_VISIBLE, false, option_header, "option_label_STEALTHTRACKER_VISIBLE", option_entry_cycler,
 		{ baselabel = "option_val_hidden_STEALTHTRACKER", baseval = HIDDEN, labels = "option_val_none_STEALTHTRACKER|option_val_visible_STEALTHTRACKER|option_val_both_STEALTHTRACKER", values = NONE .. "|" .. VISIBLE .. "|" .. both, default = HIDDEN })
+    OptionsManager.registerOption2(STEALTHTRACKER_INIT_CLEAR, false, option_header, "option_label_STEALTHTRACKER_INIT_CLEAR", option_entry_cycler,
+		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -798,10 +801,12 @@ end
 
 -- Fires when the initiative is cleared via the CT menu.  Wired up in onInit() for the host only.
 function onCombatResetEvent()
-	-- We are exiting initiative/combat, so clear all StealthTracker data from CT actors.
-	local aOutput = {}
-	getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
-	displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
+    if OptionsManager.isOption(STEALTHTRACKER_INIT_CLEAR, ON) then
+        -- We are exiting initiative/combat, so clear all StealthTracker data from CT actors.
+        local aOutput = {}
+        getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+        displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
+    end
 end
 
 function onDrop(nodetype, nodename, draginfo)

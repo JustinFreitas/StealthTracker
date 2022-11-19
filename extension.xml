@@ -19,6 +19,7 @@
 		<string name="option_label_STEALTHTRACKER_AWARE">Chat: Sees actor summary verbosity</string>
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire stealth effect</string>
 		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Ignore stealth same faction</string>
+		<string name="option_label_STEALTHTRACKER_INIT_CLEAR">CT: Remove Stealth on Init Clear</string>
 		<string name="option_label_STEALTHTRACKER_VISIBLE">Chat: Actor sees summary verbosity</string>
 		<string name="option_label_STEALTHTRACKER_VISIBILITY">Player: Show Stealth info</string>
 		<string name="option_label_STEALTHTRACKER_VERBOSE">Chat: General verbosity</string>
