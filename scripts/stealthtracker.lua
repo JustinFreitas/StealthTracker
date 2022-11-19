@@ -11,6 +11,7 @@ DEXTERITY = "dexterity"
 EFFECTS = "effects"
 FORCE_DISPLAY = true
 GENACTROLL = "genactroll"
+HIDDEN = "hidden"
 IS_FGC = false
 LAST_DRAG_INFO = nil
 LAST_NODE_NAME = nil
@@ -32,10 +33,12 @@ STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
 STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
+STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
 UNAWARE = "unaware"
 USER_ISHOST = false
+VISIBLE = "visible"
 
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
 
@@ -67,7 +70,9 @@ function onInit()
 	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
 		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
     OptionsManager.registerOption2(STEALTHTRACKER_AWARE, false, option_header, "option_label_STEALTHTRACKER_AWARE", option_entry_cycler,
-		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = AWARE .. "|" .. UNAWARE, default = both })
+		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_none_STEALTHTRACKER|option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = NONE .. "|" .. AWARE .. "|" .. UNAWARE, default = both })
+    OptionsManager.registerOption2(STEALTHTRACKER_VISIBLE, false, option_header, "option_label_STEALTHTRACKER_VISIBLE", option_entry_cycler,
+		{ baselabel = "option_val_hidden_STEALTHTRACKER", baseval = HIDDEN, labels = "option_val_none_STEALTHTRACKER|option_val_visible_STEALTHTRACKER|option_val_both_STEALTHTRACKER", values = NONE .. "|" .. VISIBLE .. "|" .. both, default = HIDDEN })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -230,7 +235,7 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 	local aOutput = {}
 	if rTarget then
 		local rHiddenTarget = isTargetHiddenFromSource(rSource, rTarget)
-		if rHiddenTarget then
+		if rHiddenTarget and rHiddenTarget.hidden then
 			local sMsgText = string.format("Target hidden. Attack possible? (%s %s: %d, %s PP: %d).",
 											ActorManager.getDisplayName(rTarget),
 											LOCALIZED_STEALTH_ABV,
@@ -421,7 +426,8 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
-	if not isTargetHiddenFromSource(rSource, rTarget) then
+    local rTargetHidden = isTargetHiddenFromSource(rSource, rTarget)
+	if rTargetHidden ~= nil and not rTargetHidden.hidden then
 		local sStats = string.format("(%s %s: %d, %s PP: %d)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
@@ -446,6 +452,7 @@ end
 
 function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
     local rStealthData = {}
+    rStealthData.visible = {} -- visible to current actor
     rStealthData.hidden = {} -- hidden from current actor
     rStealthData.aware = {} -- aware of the current actor
     rStealthData.unaware = {} -- unaware of the current actor
@@ -461,7 +468,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
         if isValidCTNode(nodeCT) then  -- hasValidType(nodeCT) or isFriend(nodeCT)
-            -- Two checks will be needed each iteration.  One for hidden and the other for aware/unaware.
+            -- Two checks will be needed each iteration.  One for visible/hidden and the other for aware/unaware.
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
@@ -469,12 +476,16 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                 if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
                     local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
-                    if rHiddenTarget and sDebilitatingCondition == nil then
-                        local sText = string.format("%s - %s: %d", -- 'ActorName' - Stealth: 8
+                    if rHiddenTarget ~= nil and sDebilitatingCondition == nil then
+                        local sText = string.format("%s - %s: %d", -- ex: ActorName - Stealth: 8
                                                     sIterationActorDisplayName,
                                                     LOCALIZED_STEALTH,
                                                     rHiddenTarget.stealth)
-                        table.insert(rStealthData.hidden, sText)
+                        if rHiddenTarget.hidden then
+                            table.insert(rStealthData.hidden, sText)
+                        else
+                            table.insert(rStealthData.visible, sText)
+                        end
                     end
 
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
@@ -505,52 +516,74 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 
     -- Data consolidation section for output table
     aOutput = validateTableOrNew(aOutput)
-	if #rStealthData.hidden > 0 then
-		local sText = string.format("%s (PP: %d) does not perceive:\r%s",
-                                    sCTSourceDisplayName,
-									getPassivePerceptionNumber(rCurrentActor),
-									table.concat(rStealthData.hidden, "\r"))
-		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-	else
-		if checkVerbosityMax() then
-			local sText = string.format("There are no actors hidden from %s.",
-                                        sCTSourceDisplayName)
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-		end
-	end
-
-    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
-        if #rStealthData.aware > 0 then
-            -- Now, let's display a summary message and append the output strings from above appended to the end.
-            local sText = string.format("%s (%s: %d) is seen by:\r%s",
-                                        sCTSourceDisplayName,
-                                        LOCALIZED_STEALTH,
-                                        nStealthSource,
-                                        table.concat(rStealthData.aware, "\r"))
-            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-        else
-            if nStealthSource ~= nil and checkVerbosityMax() then
-                local sText = string.format("There are no actors that can see %s.",
-                                            sCTSourceDisplayName)
+    if not OptionsManager.isOption(STEALTHTRACKER_VISIBLE, NONE) then
+        if not OptionsManager.isOption(STEALTHTRACKER_VISIBLE, VISIBLE) then
+            if #rStealthData.hidden > 0 then
+                local sText = string.format("%s (PP: %d) does not perceive:\r%s",
+                                            sCTSourceDisplayName,
+                                            getPassivePerceptionNumber(rCurrentActor),
+                                            table.concat(rStealthData.hidden, "\r"))
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            else
+                if checkVerbosityMax() then
+                    local sText = string.format("There are no actors hidden from %s.",
+                                                sCTSourceDisplayName)
+                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+                end
+            end
+        end
+
+        if not OptionsManager.isOption(STEALTHTRACKER_VISIBLE, HIDDEN) then
+            if #rStealthData.visible > 0 then
+                local sText = string.format("%s (PP: %d) sees:\r%s",
+                                            sCTSourceDisplayName,
+                                            getPassivePerceptionNumber(rCurrentActor),
+                                            table.concat(rStealthData.visible, "\r"))
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            else
+                if checkVerbosityMax() then
+                    local sText = string.format("There are no actors visible to %s.",
+                                                sCTSourceDisplayName)
+                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+                end
             end
         end
     end
 
-    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, AWARE) then
-        if #rStealthData.unaware > 0 then
-            -- Now, let's display a summary message and append the output strings from above appended to the end.
-            local sText = string.format("%s (%s: %d) is hidden from:\r%s",
-                                        sCTSourceDisplayName,
-                                        LOCALIZED_STEALTH,
-                                        nStealthSource,
-                                        table.concat(rStealthData.unaware, "\r"))
-            insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
-        else
-            if nStealthSource ~= nil and checkVerbosityMax() then
-                local sText = string.format("There are no actors unaware of %s.",
-                                            sCTSourceDisplayName)
+    if OptionsManager.isOption(STEALTHTRACKER_AWARE, NONE) then
+        if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
+            if #rStealthData.aware > 0 then
+                -- Now, let's display a summary message and append the output strings from above appended to the end.
+                local sText = string.format("%s (%s: %d) is seen by:\r%s",
+                                            sCTSourceDisplayName,
+                                            LOCALIZED_STEALTH,
+                                            nStealthSource,
+                                            table.concat(rStealthData.aware, "\r"))
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            else
+                if nStealthSource ~= nil and checkVerbosityMax() then
+                    local sText = string.format("There are no actors that can see %s.",
+                                                sCTSourceDisplayName)
+                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+                end
+            end
+        end
+
+        if not OptionsManager.isOption(STEALTHTRACKER_AWARE, AWARE) then
+            if #rStealthData.unaware > 0 then
+                -- Now, let's display a summary message and append the output strings from above appended to the end.
+                local sText = string.format("%s (%s: %d) is hidden from:\r%s",
+                                            sCTSourceDisplayName,
+                                            LOCALIZED_STEALTH,
+                                            nStealthSource,
+                                            table.concat(rStealthData.unaware, "\r"))
+                insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+            else
+                if nStealthSource ~= nil and checkVerbosityMax() then
+                    local sText = string.format("There are no actors unaware of %s.",
+                                                sCTSourceDisplayName)
+                    insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
+                end
             end
         end
     end
@@ -706,20 +739,25 @@ function isTargetHiddenFromSource(rSource, rTarget)
 	local rTargetCTNode = ActorManager.getCTNode(rTarget)
 	if not rTargetCTNode then return end
 
+    local data = nil
+    local nPPSource = getPassivePerceptionNumber(rSource)
 	local nStealthTarget = getStealthNumberFromEffects(rTargetCTNode)
-	if nStealthTarget ~= nil then
-		local nPPSource = getPassivePerceptionNumber(rSource)
-		if nPPSource ~= nil and nPPSource < nStealthTarget then
-			return {
-				source = rSource,
-				target = rTarget,
-				stealth = nStealthTarget,
-				sourcePP = nPPSource
-			}
+	if nStealthTarget ~= nil and nPPSource ~= nil then
+        data = {
+            source = rSource,
+            sourcePP = nPPSource,
+            target = rTarget,
+            stealth = nStealthTarget
+        }
+
+		if nPPSource < nStealthTarget then
+            data.hidden = true
+        else
+            data.hidden = false
 		end
 	end
 
-	return nil
+	return data
 end
 
 -- Valid nodes are more than just a type check now.
