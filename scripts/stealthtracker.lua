@@ -430,7 +430,7 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
     local rTargetHidden = isTargetHiddenFromSource(rSource, rTarget)
-	if rTargetHidden ~= nil and not rTargetHidden.hidden then
+	if rTargetHidden and not rTargetHidden.hidden then
 		local sStats = string.format("(%s %s: %d, %s PP: %d)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
@@ -479,7 +479,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                 if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
                     local rHiddenTarget = isTargetHiddenFromSource(rCurrentActor, rIterationActor)
-                    if rHiddenTarget ~= nil and sDebilitatingCondition == nil then
+                    if rHiddenTarget and sDebilitatingCondition == nil then
                         local sText = string.format("%s - %s: %d", -- ex: ActorName - Stealth: 8
                                                     sIterationActorDisplayName,
                                                     LOCALIZED_STEALTH,
