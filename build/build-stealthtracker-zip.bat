@@ -11,3 +11,4 @@ CALL ..\zip-items StealthTracker
 rmdir /S /Q StealthTracker\
 copy StealthTracker.zip StealthTracker.ext
 cd ..
+explorer .\out
