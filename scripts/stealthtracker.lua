@@ -38,6 +38,7 @@ STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
 UNAWARE = "unaware"
+UNIDENTIFIED = "(unidentified)"
 USER_ISHOST = false
 VISIBLE = "visible"
 
@@ -466,6 +467,10 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
+    if isBlank(sCTSourceDisplayName) then
+        sCTSourceDisplayName = UNIDENTIFIED
+    end
+
     local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
 	-- Loop through the CT, getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
@@ -475,6 +480,10 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
+                if isBlank(sIterationActorDisplayName) then
+                    sIterationActorDisplayName = UNIDENTIFIED
+                end
+
                 local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
                 if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
@@ -703,6 +712,19 @@ end
 function insertFormattedTextWithSeparatorIfNonEmpty(aTable, sFormattedText)
 	insertBlankSeparatorIfNotEmpty(aTable)
 	table.insert(aTable, sFormattedText)
+end
+
+function isBlank(sTest)
+    if type(sTest) ~= "string" then
+        return false
+    end
+
+    local sCooked = string.gsub(sTest, "$s+", "")
+    if sCooked == "" then
+        return true
+    else
+        return false
+    end
 end
 
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
