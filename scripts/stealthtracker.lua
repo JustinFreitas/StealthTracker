@@ -33,11 +33,13 @@ STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
 STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
 STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_INIT_CLEAR = "STEALTHTRACKER_INIT_CLEAR"
+STEALTHTRACKER_SHOW_AFTER_STEALTH = "STEALTHTRACKER_SHOW_AFTER_STEALTH"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
 TURN = "turn"
 UNAWARE = "unaware"
+UNIDENTIFIED = "(unidentified)"
 USER_ISHOST = false
 VISIBLE = "visible"
 
@@ -76,6 +78,8 @@ function onInit()
 		{ baselabel = "option_val_hidden_STEALTHTRACKER", baseval = HIDDEN, labels = "option_val_none_STEALTHTRACKER|option_val_visible_STEALTHTRACKER|option_val_both_STEALTHTRACKER", values = NONE .. "|" .. VISIBLE .. "|" .. both, default = HIDDEN })
     OptionsManager.registerOption2(STEALTHTRACKER_INIT_CLEAR, false, option_header, "option_label_STEALTHTRACKER_INIT_CLEAR", option_entry_cycler,
 		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+    OptionsManager.registerOption2(STEALTHTRACKER_SHOW_AFTER_STEALTH, false, option_header, "option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH", option_entry_cycler,
+        { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -277,6 +281,11 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
 			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
 				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
+                -- Display the stealth information now that the Stealth roll has been made so the DM can take advantage of the info if it all happens on the same turn (i.e. hide, then attack).
+                if OptionsManager.isOption(STEALTHTRACKER_SHOW_AFTER_STEALTH, ON) then
+                    local nodeCT = ActorManager.getCTNode(rSource.sCTNode)
+                    displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, FORCE_DISPLAY)
+                end
 			end
 		elseif isPlayerStealthInfoDisabled() and not checkVerbosityOff() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
 			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
@@ -466,6 +475,10 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
+    if isBlank(sCTSourceDisplayName) then
+        sCTSourceDisplayName = UNIDENTIFIED
+    end
+
     local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
 	-- Loop through the CT, getSortedCombatantList() returns the list ordered as-is in CT (sorted by the CombatManager.sortfuncDnD sort function loaded by the 5e ruleset) and is never nil
 	local lCombatTrackerActors = CombatManager.getSortedCombatantList()
@@ -475,6 +488,10 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
+                if isBlank(sIterationActorDisplayName) then
+                    sIterationActorDisplayName = UNIDENTIFIED
+                end
+
                 local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
                 if rCurrentActor.sCTNode ~= rIterationActor.sCTNode and  -- Current actor doesn't equal iteration actor (no need to report on the actors own visibility!).
                    (not checkFactionFilter() or isDifferentFaction(nodeCTSource, nodeCT)) then  -- friendly faction filter
@@ -553,7 +570,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
         end
     end
 
-    if OptionsManager.isOption(STEALTHTRACKER_AWARE, NONE) then
+    if not OptionsManager.isOption(STEALTHTRACKER_AWARE, NONE) then
         if not OptionsManager.isOption(STEALTHTRACKER_AWARE, UNAWARE) then
             if #rStealthData.aware > 0 then
                 -- Now, let's display a summary message and append the output strings from above appended to the end.
@@ -703,6 +720,19 @@ end
 function insertFormattedTextWithSeparatorIfNonEmpty(aTable, sFormattedText)
 	insertBlankSeparatorIfNotEmpty(aTable)
 	table.insert(aTable, sFormattedText)
+end
+
+function isBlank(sTest)
+    if type(sTest) ~= "string" then
+        return false
+    end
+
+    local sCooked = string.gsub(sTest, "$s+", "")
+    if sCooked == "" then
+        return true
+    else
+        return false
+    end
 end
 
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
