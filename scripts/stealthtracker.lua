@@ -282,8 +282,8 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
 				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
                 -- Display the stealth information now that the Stealth roll has been made so the DM can take advantage of the info if it all happens on the same turn (i.e. hide, then attack).
-                local nodeCT = ActorManager.getCTNode(rSource.sCTNode)
                 if OptionsManager.isOption(STEALTHTRACKER_SHOW_AFTER_STEALTH, ON) then
+                    local nodeCT = ActorManager.getCTNode(rSource.sCTNode)
                     displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, FORCE_DISPLAY)
                 end
 			end
