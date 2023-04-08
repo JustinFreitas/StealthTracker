@@ -4,7 +4,7 @@
 	<announcement text="StealthTracker v3.9 FGC/FGU 5E, 4/7/23\r2016-2023 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.8.1</version>
+		<version>3.9</version>
 		<loadorder>999</loadorder>
 		<author>Justin Freitas</author>
 		<description>Stealth tracking via effects in the Combat Tracker with related information regarding the hiding actor and who can and cannot see them.</description>
