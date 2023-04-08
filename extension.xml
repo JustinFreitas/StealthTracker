@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="StealthTracker v3.8.1 FGC/FGU 5E, 1/6/23\r2016-2023 Justin Freitas" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.9 FGC/FGU 5E, 4/7/23\r2016-2023 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
 		<version>3.8.1</version>
@@ -20,6 +20,7 @@
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire stealth effect</string>
 		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Ignore stealth same faction</string>
 		<string name="option_label_STEALTHTRACKER_INIT_CLEAR">CT: Remove Stealth on Init Clear</string>
+		<string name="option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH">Chat: Show summary after stealth</string>
 		<string name="option_label_STEALTHTRACKER_VISIBLE">Chat: Actor sees summary verbosity</string>
 		<string name="option_label_STEALTHTRACKER_VISIBILITY">Player: Show Stealth info</string>
 		<string name="option_label_STEALTHTRACKER_VERBOSE">Chat: General verbosity</string>
