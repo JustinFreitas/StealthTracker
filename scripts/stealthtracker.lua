@@ -477,8 +477,8 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
-    if isBlank(sCTSourceDisplayName) then
-        sCTSourceDisplayName = UNIDENTIFIED
+    if isUnidentifiedNpc(nodeCTSource) then
+        sCTSourceDisplayName = DB.getValue(nodeCTSource, "nonid_name", UNIDENTIFIED)
     end
 
     local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
@@ -490,8 +490,8 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
-                if isBlank(sIterationActorDisplayName) then
-                    sIterationActorDisplayName = UNIDENTIFIED
+                if isUnidentifiedNpc(nodeCT) then
+                    sIterationActorDisplayName = DB.getValue(nodeCT, "nonid_name", UNIDENTIFIED)
                 end
 
                 local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
@@ -724,19 +724,6 @@ function insertFormattedTextWithSeparatorIfNonEmpty(aTable, sFormattedText)
 	table.insert(aTable, sFormattedText)
 end
 
-function isBlank(sTest)
-    if type(sTest) ~= "string" then
-        return false
-    end
-
-    local sCooked = string.gsub(sTest, "$s+", "")
-    if sCooked == "" then
-        return true
-    else
-        return false
-    end
-end
-
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
 function isDexterityCheckRoll(sRollData)
 	-- % is the escape character in Lua patterns.
@@ -793,6 +780,10 @@ function isTargetHiddenFromSource(rSource, rTarget)
 	end
 
 	return data
+end
+
+function isUnidentifiedNpc(nodeRecord)
+    return isNpc(nodeRecord) and DB.getValue(nodeRecord, "isidentified", 1) == 0
 end
 
 -- Valid nodes are more than just a type check now.
