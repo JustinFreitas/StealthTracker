@@ -1,5 +1,5 @@
 -- Things to test--
--- Handlers: onTurnStartEvent(), onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT.
+-- Handlers: onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT, requestActivation().
 -- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
 -- onRoll Overrides: onDropEvent , onRollSkill (stealth), onRollAttack.
 -- Post roll handlers: onGenericActionPostRoll
@@ -43,7 +43,7 @@ UNIDENTIFIED = "(unidentified)"
 USER_ISHOST = false
 VISIBLE = "visible"
 
-local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop
+local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop, CombatManager_requestActivation
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
@@ -83,7 +83,6 @@ function onInit()
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
-		CombatManager.setCustomTurnStart(onTurnStartEvent)
 		CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
 		if CombatDropManager then
@@ -93,6 +92,9 @@ function onInit()
 			CombatManager_onDrop = CombatManager.onDrop
 			CombatManager.onDrop = onDrop
 		end
+
+        CombatManager_requestActivation = CombatManager.requestActivation
+        CombatManager.requestActivation = requestActivation
 
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
@@ -920,13 +922,6 @@ function onRollSkill(rSource, rTarget, rRoll)
 	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 end
 
--- This function is one that the Combat Tracker calls if present at the start of a creatures turn.  Wired up in onInit() for the host only.
-function onTurnStartEvent(nodeEntry)
-	-- If the current actor is NPC, add Stealth +0 to their skills if no Stealth skill exists.
-	ensureStealthSkillExistsOnNpc(nodeEntry)
-	displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
-end
-
 -- Handler for the 'st' and 'stealthtracker' slash commands in chat.
 function processChatCommand(_, sParams)
 	-- Only allow administrative subcommands when run on the host/DM system.
@@ -962,6 +957,12 @@ function processHostOnlySubcommands(sSubcommand)
 
 	-- Fallthrough/unrecognized subcommand
 	return sSubcommand
+end
+
+function requestActivation(nodeEntry, bSkipBell)
+    CombatManager_requestActivation(nodeEntry, bSkipBell)
+    ensureStealthSkillExistsOnNpc(nodeEntry)
+	displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
 end
 
 -- Function to encapsulate the setting of the name with stealth value.
