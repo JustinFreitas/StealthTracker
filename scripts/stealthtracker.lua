@@ -477,8 +477,8 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
-    if isUnidentifiedNpc(nodeCTSource) then
-        sCTSourceDisplayName = DB.getValue(nodeCTSource, "nonid_name", UNIDENTIFIED)
+    if isBlank(sCTSourceDisplayName) or isUnidentifiedNpc(nodeCTSource) then
+        sCTSourceDisplayName = getUnidentifiedName(nodeCTSource)
     end
 
     local nStealthSource = getStealthNumberFromEffects(nodeCTSource)
@@ -490,8 +490,8 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
             local rIterationActor = ActorManager.resolveActor(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
-                if isUnidentifiedNpc(nodeCT) then
-                    sIterationActorDisplayName = DB.getValue(nodeCT, "nonid_name", UNIDENTIFIED)
+                if isBlank(sIterationActorDisplayName) or isUnidentifiedNpc(nodeCT) then
+                    sIterationActorDisplayName = getUnidentifiedName(nodeCT)
                 end
 
                 local sDebilitatingCondition = getActorDebilitatingCondition(rIterationActor)
@@ -692,6 +692,15 @@ function getStealthValueFromEffectNode(nodeEffect)
 	return sExtractedStealth
 end
 
+function getUnidentifiedName(nodeRecord)
+    local unidentifiedName = DB.getValue(nodeRecord, "nonid_name", UNIDENTIFIED)
+    if isBlank(unidentifiedName) then
+        unidentifiedName = UNIDENTIFIED
+    end
+
+    return unidentifiedName
+end
+
 -- Handler for the message to do an attack from a position of stealth.
 function handleAttackFromStealth(msgOOB)
 	displayProcessAttackFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode), ActorManager.resolveActor(msgOOB.sTargetCTNode))
@@ -722,6 +731,19 @@ end
 function insertFormattedTextWithSeparatorIfNonEmpty(aTable, sFormattedText)
 	insertBlankSeparatorIfNotEmpty(aTable)
 	table.insert(aTable, sFormattedText)
+end
+
+function isBlank(sTest)
+    if type(sTest) ~= "string" then
+        return false
+    end
+
+    local sCooked = string.gsub(sTest, "$s+", "")
+    if sCooked == "" then
+        return true
+    else
+        return false
+    end
 end
 
 -- Checks to see if the roll description (or drag info data) is a dexterity check roll.
