@@ -615,17 +615,17 @@ end
 
 -- This gets the Passive Perception number from the character sheet for pcs and ct node for npc.
 -- This function can return nil.
-function getPassivePerceptionNumber(rActor)
-	local nodeCreature = ActorManager.getCreatureNode(rActor)
+function getPassivePerceptionNumber(vActor)
+	local nodeCreature = ActorManager.getCreatureNode(vActor)
 	if not nodeCreature then return 10 end
 
 	-- The perception is calculated from different sheets for pc vs npc.
 	local nPP
-	if ActorManager.isPC(rActor) then
+	if ActorManager.isPC(vActor) then
 		-- For a PC it's the perception child node.
 		-- The perception value is always populated and always a number type.
 		nPP = DB.getValue(nodeCreature, "perception")
-	elseif isNpc(rActor) then
+	elseif isNpc(vActor) then
 		-- Limitation: NPC must have 'passive Perception X' in the 'senses' field, otherwise, 10+wis is used.
 		nPP = tonumber(string.match(DB.getText(nodeCreature, "senses", ""):lower(), "passive%s+perception%s+(%-?%d+)"))
 	end
@@ -810,7 +810,8 @@ end
 
 -- Valid nodes are more than just a type check now.
 function isValidCTNode(nodeCT)
-	return hasValidType(nodeCT) or isFriend(nodeCT)
+	return (hasValidType(nodeCT) or isFriend(nodeCT))
+            and getPassivePerceptionNumber(nodeCT) > 0
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
