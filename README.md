@@ -1,6 +1,6 @@
 # StealthTracker
 
-StealthTracker v3.10 by Justin Freitas
+StealthTracker v3.11 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -61,5 +61,6 @@ Changelist:
 - v3.8 - Much like the new option for v3.7, this 3.8 version adds verbosity option around what the current actor sees.  Historically, only hidden actors were reported in this summary.  Now, it collects CT actors that are visible to the current actor also.  Thew new option is for 'Chat: Source stealth summary verbosity' and can be None, Visible, Hidden, Both.  Also, I added an option to disable/enable the clearing of the Stealth effects on Initiative Clear.  Thanks to Tooting Dog for the suggestions!
 - v3.9 - When a character's display name is blank, use (unidentified) instead when outputting stealth information to chat.  Fixed a bug with the 'Sees Actor' option where only 'None' was working (and it was working as 'Both').  Now, all of the options work correctly for 'Sees Actor'.  Thanks for that bug report, Xerophilex.  There is a new option to 'Chat: Show summary after stealth' which will show the summary information in the chat (according to the options set for StealthTracker) after an actor rolls stealth... another great suggestion by Xerophilex.
 - v3.10 - Changed the in-combat firing of the stealth functionality fromn onTurnStart to requestActivation.  Now, it works when you click the left CT bar to activate an actor that way (and still works when using the Next Actor button too).  I'll be applying this change to all of my Tracker extensions.  Updated the option names to be more understandable and have correct casing.  Updated the unidentified creature name usage to be correct if an NPC is unidentified.  It will now use the unidentified name in that case so chat matches CT name, reducing confusion.
+- v3.11 - Add Passive Perception greater than zero to the valid actor check.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
