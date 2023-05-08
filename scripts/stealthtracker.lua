@@ -720,8 +720,12 @@ function handleUpdateStealth(msgOOB)
 end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
-function hasValidType(vActor)
-	return ActorManager.getRecordType(vActor) ~= ""
+function hasValidType(nodeCTActor)
+    local sNpcType = DB.getText(nodeCTActor, "type", ""):lower() -- this is 'Race' on a PC sheet and 'type' (i.e. Object, Trap, Beast, etc) on an NPC sheet.
+	return sNpcType ~= ""
+        and not sNpcType:match("^%s*trap%s*$") -- TODO: Make this optional, defaulting to true.
+        and not sNpcType:match("^%s*object%s*$") -- TODO: Make this optional, defaulting to true.
+        and not isStealthTrackerDisabledForActor(nodeCTActor)
 end
 
 function insertBlankSeparatorIfNotEmpty(aTable)
@@ -775,6 +779,10 @@ function isStealthSkillRoll(sRollData)
 	return sRollData and sRollData:lower():match("%[skill%] " .. LOCALIZED_STEALTH_LOWER)
 end
 
+function isStealthTrackerDisabledForActor(nodeCTActor)
+    return nodeCTActor and DB.getText(nodeCTActor, "senses", ""):lower():match("no stealthtracker")
+end
+
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
 function isTargetHiddenFromSource(rSource, rTarget)
 	if not rSource or not rTarget then return end
@@ -811,7 +819,7 @@ end
 -- Valid nodes are more than just a type check now.
 function isValidCTNode(nodeCT)
 	return (hasValidType(nodeCT) or isFriend(nodeCT))
-            and getPassivePerceptionNumber(nodeCT) > 0
+            and not isStealthTrackerDisabledForActor(nodeCT)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
@@ -975,6 +983,8 @@ end
 
 function requestActivation(nodeEntry, bSkipBell)
     CombatManager_requestActivation(nodeEntry, bSkipBell)
+    if not isValidCTNode(nodeEntry) then return end
+
     ensureStealthSkillExistsOnNpc(nodeEntry)
 	displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
 end
