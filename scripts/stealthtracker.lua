@@ -1,10 +1,3 @@
--- Things to test--
--- Handlers: onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT, requestActivation().
--- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
--- onRoll Overrides: onDropEvent , onRollSkill (stealth), onRollAttack.
--- Post roll handlers: onGenericActionPostRoll
--- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
-
 ALL = "all"
 AWARE = "aware"
 DEXTERITY = "dexterity"
