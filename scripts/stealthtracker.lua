@@ -712,6 +712,8 @@ function getProficiencyBonusForNPCChallengeRating(nodeActor)
         or sCR == "30" then
         return 9
     end
+
+    return 0
 end
 
 
