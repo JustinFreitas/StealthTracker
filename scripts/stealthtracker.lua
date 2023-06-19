@@ -1,10 +1,3 @@
--- Things to test--
--- Handlers: onCombatResetEvent() - initiative clear, onDropEvent() - dropping dex or stealth rolls on CT, requestActivation().
--- Messages: OOB_MSGTYPE_UPDATESTEALTH, OOB_MSGTYPE_ATTACKFROMSTEALTH.
--- onRoll Overrides: onDropEvent , onRollSkill (stealth), onRollAttack.
--- Post roll handlers: onGenericActionPostRoll
--- Options: STEALTHTRACKER_ALLOW_OUT_OF, STEALTHTRACKER_EXPIRE_EFFECT, STEALTHTRACKER_FACTION_FILTER, STEALTHTRACKER_VISIBILITY, STEALTHTRACKER_VERBOSE
-
 ALL = "all"
 AWARE = "aware"
 DEXTERITY = "dexterity"
@@ -615,17 +608,17 @@ end
 
 -- This gets the Passive Perception number from the character sheet for pcs and ct node for npc.
 -- This function can return nil.
-function getPassivePerceptionNumber(rActor)
-	local nodeCreature = ActorManager.getCreatureNode(rActor)
+function getPassivePerceptionNumber(vActor)
+	local nodeCreature = ActorManager.getCreatureNode(vActor)
 	if not nodeCreature then return 10 end
 
 	-- The perception is calculated from different sheets for pc vs npc.
 	local nPP
-	if ActorManager.isPC(rActor) then
+	if ActorManager.isPC(vActor) then
 		-- For a PC it's the perception child node.
 		-- The perception value is always populated and always a number type.
 		nPP = DB.getValue(nodeCreature, "perception")
-	elseif isNpc(rActor) then
+	elseif isNpc(vActor) then
 		-- Limitation: NPC must have 'passive Perception X' in the 'senses' field, otherwise, 10+wis is used.
 		nPP = tonumber(string.match(DB.getText(nodeCreature, "senses", ""):lower(), "passive%s+perception%s+(%-?%d+)"))
 	end
@@ -645,12 +638,77 @@ function getProficiencyBonus(vActor)
     if sNodeType == "pc" then
         nStatScore = DB.getValue(nodeActor, "profbonus", 0);
     else
-        local nCR = tonumber(DB.getValue(nodeActor, "cr", ""):match("^%d+$")) or 0;
-        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2); -- Formula for the CR to prof bonus chart.  From FG 5e ruleset.
+        nStatScore = getProficiencyBonusForNPCChallengeRating(nodeActor) or 0;
     end
 
     return nStatScore
 end
+
+function getProficiencyBonusForNPCChallengeRating(nodeActor)
+    local sCR = DB.getValue(nodeActor, "cr", "")
+    if sCR == "" then return 0 end
+
+    if     sCR == "0"
+        or sCR == "1/8"
+        or sCR == "1/4"
+        or sCR == "1/2"
+        or sCR == "1"
+        or sCR == "2"
+        or sCR == "3"
+        or sCR == "4" then
+        return 2
+    end
+
+    if     sCR == "5"
+        or sCR == "6"
+        or sCR == "7"
+        or sCR == "8" then
+        return 3
+    end
+
+    if     sCR == "9"
+        or sCR == "10"
+        or sCR == "11"
+        or sCR == "12" then
+        return 4
+    end
+
+    if     sCR == "13"
+        or sCR == "14"
+        or sCR == "15"
+        or sCR == "16" then
+        return 5
+    end
+
+    if     sCR == "17"
+        or sCR == "18"
+        or sCR == "19"
+        or sCR == "20" then
+        return 6
+    end
+
+    if     sCR == "21"
+        or sCR == "22"
+        or sCR == "23"
+        or sCR == "24" then
+        return 7
+    end
+
+    if     sCR == "25"
+        or sCR == "26"
+        or sCR == "27"
+        or sCR == "28" then
+        return 8
+    end
+
+    if     sCR == "29"
+        or sCR == "30" then
+        return 9
+    end
+
+    return 0
+end
+
 
 -- Function that walks the effects for a given CT node and extracts the last 'Stealth: X' effect stealth value.
 function getStealthNumberFromEffects(nodeCT)
@@ -720,8 +778,12 @@ function handleUpdateStealth(msgOOB)
 end
 
 -- Check a CT node for a valid type.  Currently any non-empty type is valid but might be restricted in the future (i.e. Trap, Object, etc.)
-function hasValidType(vActor)
-	return ActorManager.getRecordType(vActor) ~= ""
+function hasValidType(nodeCTActor)
+    local sNpcType = DB.getText(nodeCTActor, "type", ""):lower() -- this is 'Race' on a PC sheet and 'type' (i.e. Object, Trap, Beast, etc) on an NPC sheet.
+	return sNpcType ~= ""
+        and not sNpcType:match("^%s*trap%s*$") -- TODO: Make this optional, defaulting to true.
+        and not sNpcType:match("^%s*object%s*$") -- TODO: Make this optional, defaulting to true.
+        and not isStealthTrackerDisabledForActor(nodeCTActor)
 end
 
 function insertBlankSeparatorIfNotEmpty(aTable)
@@ -775,6 +837,10 @@ function isStealthSkillRoll(sRollData)
 	return sRollData and sRollData:lower():match("%[skill%] " .. LOCALIZED_STEALTH_LOWER)
 end
 
+function isStealthTrackerDisabledForActor(nodeCTActor)
+    return nodeCTActor and DB.getText(nodeCTActor, "senses", ""):lower():match("no stealthtracker")
+end
+
 -- Function to process the condition of the source perceiving the target (source PP >= target stealth).  Returns a table representing the hidden actor otherwise, nil.
 function isTargetHiddenFromSource(rSource, rTarget)
 	if not rSource or not rTarget then return end
@@ -810,7 +876,8 @@ end
 
 -- Valid nodes are more than just a type check now.
 function isValidCTNode(nodeCT)
-	return hasValidType(nodeCT) or isFriend(nodeCT)
+	return (hasValidType(nodeCT) or isFriend(nodeCT))
+            and not isStealthTrackerDisabledForActor(nodeCT)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
@@ -974,6 +1041,8 @@ end
 
 function requestActivation(nodeEntry, bSkipBell)
     CombatManager_requestActivation(nodeEntry, bSkipBell)
+    if not isValidCTNode(nodeEntry) then return end
+
     ensureStealthSkillExistsOnNpc(nodeEntry)
 	displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
 end
