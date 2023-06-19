@@ -645,12 +645,75 @@ function getProficiencyBonus(vActor)
     if sNodeType == "pc" then
         nStatScore = DB.getValue(nodeActor, "profbonus", 0);
     else
-        local nCR = tonumber(DB.getValue(nodeActor, "cr", ""):match("^%d+$")) or 0;
-        nStatScore = math.max(2, math.floor((nCR - 1) / 4) + 2); -- Formula for the CR to prof bonus chart.  From FG 5e ruleset.
+        nStatScore = getProficiencyBonusForNPCChallengeRating(nodeActor) or 0;
     end
 
     return nStatScore
 end
+
+function getProficiencyBonusForNPCChallengeRating(nodeActor)
+    local sCR = DB.getValue(nodeActor, "cr", "")
+    if sCR == "" then return 0 end
+
+    if     sCR == "0"
+        or sCR == "1/8"
+        or sCR == "1/4"
+        or sCR == "1/2"
+        or sCR == "1"
+        or sCR == "2"
+        or sCR == "3"
+        or sCR == "4" then
+        return 2
+    end
+
+    if     sCR == "5"
+        or sCR == "6"
+        or sCR == "7"
+        or sCR == "8" then
+        return 3
+    end
+
+    if     sCR == "9"
+        or sCR == "10"
+        or sCR == "11"
+        or sCR == "12" then
+        return 4
+    end
+
+    if     sCR == "13"
+        or sCR == "14"
+        or sCR == "15"
+        or sCR == "16" then
+        return 5
+    end
+
+    if     sCR == "17"
+        or sCR == "18"
+        or sCR == "19"
+        or sCR == "20" then
+        return 6
+    end
+
+    if     sCR == "21"
+        or sCR == "22"
+        or sCR == "23"
+        or sCR == "24" then
+        return 7
+    end
+
+    if     sCR == "25"
+        or sCR == "26"
+        or sCR == "27"
+        or sCR == "28" then
+        return 8
+    end
+
+    if     sCR == "29"
+        or sCR == "30" then
+        return 9
+    end
+end
+
 
 -- Function that walks the effects for a given CT node and extracts the last 'Stealth: X' effect stealth value.
 function getStealthNumberFromEffects(nodeCT)
