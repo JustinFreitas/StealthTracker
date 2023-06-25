@@ -557,7 +557,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
             else
                 if checkVerbosityMax() then
-                    local sText = string.format("There are no actors visible to %s.",
+                    local sText = string.format("There are no hiding actors visible to %s.",
                                                 sCTSourceDisplayName)
                     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
                 end
