@@ -5,7 +5,7 @@
 	<properties>
 		<name>Feature: StealthTracker</name>
 		<version>3.12</version>
-		<loadorder>999</loadorder>
+		<loadorder>9999</loadorder>
 		<author>Justin Freitas</author>
 		<description>Stealth tracking via effects in the Combat Tracker with related information regarding the hiding actor and who can and cannot see them.</description>
 		<ruleset>
