@@ -192,7 +192,7 @@ end
 function displayChatMessage(sFormattedText, bSecret)
 	if sFormattedText == nil then return end
 
-	local msg = {font = "msgfont", icon = "stealth_icon", secret = bSecret, text = sFormattedText}
+	local msg = {font = "msgfont", icon = "stealth_icon", secret = false, text = sFormattedText}  -- secret true shows the cross eye icon, wasting space
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
