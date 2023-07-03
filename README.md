@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v3.11 by Justin Freitas
+StealthTracker v3.12 by Justin Freitas
 
 ReadMe and Usage Notes
 
