@@ -26,7 +26,7 @@ echo end if >> _zipIt.vbs
 @ECHO Zipping, please wait...
 mkdir %TEMPDIR%
 xcopy /y /s %FILETOZIP% %TEMPDIR%
-WScript _zipIt.vbs  %TEMPDIR%  %OUTPUTZIP%
+cscript //NoLogo _zipIt.vbs  %TEMPDIR%  %OUTPUTZIP%
 del _zipIt.vbs
 rmdir /s /q  %TEMPDIR%
 
