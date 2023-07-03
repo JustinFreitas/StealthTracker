@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v3.12 by Justin Freitas
+StealthTracker v3.13 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -66,5 +66,6 @@ Changelist:
 - v3.10 - Changed the in-combat firing of the stealth functionality fromn onTurnStart to requestActivation.  Now, it works when you click the left CT bar to activate an actor that way (and still works when using the Next Actor button too).  I'll be applying this change to all of my Tracker extensions.  Updated the option names to be more understandable and have correct casing.  Updated the unidentified creature name usage to be correct if an NPC is unidentified.  It will now use the unidentified name in that case so chat matches CT name, reducing confusion.
 - v3.11 - Add Passive Perception greater than zero to the valid actor check.  Fixed a bug with the proficiency bonus of NPCs being incorrect in fractional cases and probably other cases also.
 - v3.12 - Update the status text for clarity.  Icon update using Sir Motte's template.
+- v3.13 - No secret eye icon in chat messages, it takes too much space.  Change to the build script.  Later loading sequence to ensure new icon.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
