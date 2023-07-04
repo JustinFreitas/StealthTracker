@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v3.13 by Justin Freitas
+StealthTracker v3.14 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -67,5 +67,6 @@ Changelist:
 - v3.11 - Add Passive Perception greater than zero to the valid actor check.  Fixed a bug with the proficiency bonus of NPCs being incorrect in fractional cases and probably other cases also.
 - v3.12 - Update the status text for clarity.  Icon update using Sir Motte's template.
 - v3.13 - No secret eye icon in chat messages, it takes too much space.  Change to the build script.  Later loading sequence to ensure new icon.
+- v3.14 - Another icon update, 42px this time.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
