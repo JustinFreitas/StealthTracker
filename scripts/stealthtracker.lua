@@ -36,6 +36,14 @@ UNIDENTIFIED = "(unidentified)"
 USER_ISHOST = false
 VISIBLE = "visible"
 
+A_CHECK_FILTER = {
+    "wisdom"
+}
+A_SKILL_FILTER = {
+    "perception",
+    "wisdom"
+}
+
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop, CombatManager_requestActivation
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
@@ -48,35 +56,35 @@ function onInit()
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
-	local option_entry_cycler = "option_entry_cycler"
-	local option_header = "option_header_STEALTHTRACKER"
-	local option_val_none = "option_val_none_STEALTHTRACKER"
-	local option_val_off = "option_val_off"
-    local both = "both"
-	local standard = "standard"
-
-	OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
-		{ baselabel = option_val_none, baseval = NONE, labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|" .. ALL, default = NONE })
-	OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, option_header, "option_label_STEALTHTRACKER_EXPIRE_EFFECT", option_entry_cycler,
-		{ baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = ALL, labels = "option_val_attack_STEALTHTRACKER|" .. option_val_none, values = "attack|" .. NONE, default = ALL })
-	OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, option_header, "option_label_STEALTHTRACKER_FACTION_FILTER", option_entry_cycler,
-		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
-	OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, option_header, "option_label_STEALTHTRACKER_VISIBILITY", option_entry_cycler,
-		{ baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
-	OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
-		{ baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
-    OptionsManager.registerOption2(STEALTHTRACKER_AWARE, false, option_header, "option_label_STEALTHTRACKER_AWARE", option_entry_cycler,
-		{ baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_none_STEALTHTRACKER|option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = NONE .. "|" .. AWARE .. "|" .. UNAWARE, default = both })
-    OptionsManager.registerOption2(STEALTHTRACKER_VISIBLE, false, option_header, "option_label_STEALTHTRACKER_VISIBLE", option_entry_cycler,
-		{ baselabel = "option_val_hidden_STEALTHTRACKER", baseval = HIDDEN, labels = "option_val_none_STEALTHTRACKER|option_val_visible_STEALTHTRACKER|option_val_both_STEALTHTRACKER", values = NONE .. "|" .. VISIBLE .. "|" .. both, default = HIDDEN })
-    OptionsManager.registerOption2(STEALTHTRACKER_INIT_CLEAR, false, option_header, "option_label_STEALTHTRACKER_INIT_CLEAR", option_entry_cycler,
-		{ labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
-    OptionsManager.registerOption2(STEALTHTRACKER_SHOW_AFTER_STEALTH, false, option_header, "option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH", option_entry_cycler,
-        { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
-
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
-		CombatManager.setCustomCombatReset(onCombatResetEvent)
+        local option_entry_cycler = "option_entry_cycler"
+        local option_header = "option_header_STEALTHTRACKER"
+        local option_val_none = "option_val_none_STEALTHTRACKER"
+        local option_val_off = "option_val_off"
+        local both = "both"
+        local standard = "standard"
+
+        OptionsManager.registerOption2(STEALTHTRACKER_ALLOW_OUT_OF, false, option_header, "option_label_STEALTHTRACKER_ALLOW_OUT_OF", option_entry_cycler,
+            { baselabel = option_val_none, baseval = NONE, labels = "option_val_turn_STEALTHTRACKER|option_val_turn_and_combat_STEALTHTRACKER", values = "turn|" .. ALL, default = NONE })
+        OptionsManager.registerOption2(STEALTHTRACKER_EXPIRE_EFFECT, false, option_header, "option_label_STEALTHTRACKER_EXPIRE_EFFECT", option_entry_cycler,
+            { baselabel = "option_val_attack_and_round_STEALTHTRACKER", baseval = ALL, labels = "option_val_attack_STEALTHTRACKER|" .. option_val_none, values = "attack|" .. NONE, default = ALL })
+        OptionsManager.registerOption2(STEALTHTRACKER_FACTION_FILTER, false, option_header, "option_label_STEALTHTRACKER_FACTION_FILTER", option_entry_cycler,
+            { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+        OptionsManager.registerOption2(STEALTHTRACKER_VISIBILITY, false, option_header, "option_label_STEALTHTRACKER_VISIBILITY", option_entry_cycler,
+            { baselabel = "option_val_chat_and_effects_STEALTHTRACKER", baseval = ALL, labels = "option_val_effects_STEALTHTRACKER|" .. option_val_none, values = EFFECTS .. "|" .. NONE, default = EFFECTS })
+        OptionsManager.registerOption2(STEALTHTRACKER_VERBOSE, false, option_header, "option_label_STEALTHTRACKER_VERBOSE", option_entry_cycler,
+            { baselabel = "option_val_standard", baseval = standard, labels = "option_val_max|" .. option_val_off, values = "max|" .. OFF, default = standard })
+        OptionsManager.registerOption2(STEALTHTRACKER_AWARE, false, option_header, "option_label_STEALTHTRACKER_AWARE", option_entry_cycler,
+            { baselabel = "option_val_both_STEALTHTRACKER", baseval = both, labels = "option_val_none_STEALTHTRACKER|option_val_aware_STEALTHTRACKER|option_val_unaware_STEALTHTRACKER", values = NONE .. "|" .. AWARE .. "|" .. UNAWARE, default = both })
+        OptionsManager.registerOption2(STEALTHTRACKER_VISIBLE, false, option_header, "option_label_STEALTHTRACKER_VISIBLE", option_entry_cycler,
+            { baselabel = "option_val_hidden_STEALTHTRACKER", baseval = HIDDEN, labels = "option_val_none_STEALTHTRACKER|option_val_visible_STEALTHTRACKER|option_val_both_STEALTHTRACKER", values = NONE .. "|" .. VISIBLE .. "|" .. both, default = HIDDEN })
+        OptionsManager.registerOption2(STEALTHTRACKER_INIT_CLEAR, false, option_header, "option_label_STEALTHTRACKER_INIT_CLEAR", option_entry_cycler,
+            { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+        OptionsManager.registerOption2(STEALTHTRACKER_SHOW_AFTER_STEALTH, false, option_header, "option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH", option_entry_cycler,
+            { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
+
+            CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
 		if CombatDropManager then
 			CombatManager_onDrop = CombatDropManager.onLegacyDropEvent
@@ -629,7 +637,66 @@ function getPassivePerceptionNumber(vActor)
 		nPP = getDefaultPassivePerception(nodeCreature)
 	end
 
-	return nPP
+    return modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
+end
+
+function modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
+    local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(nodeCreature)
+    local nAdvBonus = bAdv and 5 or 0
+    local nDisadvPenalty = bDisadv and -5 or 0
+    return nPP + nAdvBonus + nDisadvPenalty + nAddMod
+end
+
+function getAdvDisadvForPerception(nodeCreature)
+    local bADV, bDIS = false, false
+    if EffectManager5E.hasEffectCondition(nodeCreature, "ADVSKILL") then
+        bADV = true
+    elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVSKILL", A_SKILL_FILTER)) > 0 then
+        bADV = true
+    elseif EffectManager5E.hasEffectCondition(nodeCreature, "ADVCHK") then
+        bADV = true
+    elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVCHK", A_CHECK_FILTER)) > 0 then
+        bADV = true
+    end
+    if EffectManager5E.hasEffectCondition(nodeCreature, "DISSKILL") then
+        bDIS = true
+    elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISSKILL", A_SKILL_FILTER)) > 0 then
+        bDIS = true
+    elseif EffectManager5E.hasEffectCondition(nodeCreature, "DISCHK") then
+        bDIS = true
+    elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISCHK", A_CHECK_FILTER)) > 0 then
+        bDIS = true
+    end
+
+    -- if EffectManager5E.hasEffectCondition(nodeCreature, "Frightened") then
+    --     bDIS = true
+    -- end
+
+    -- Get ability modifiers
+    local aAddDice, nAddMod, _ = EffectManager5E.getEffectsBonus(nodeCreature, {"CHECK"}, false, A_CHECK_FILTER)
+    local aSkillAddDice, nSkillAddMod, nSkillEffectCount = EffectManager5E.getEffectsBonus(nodeCreature, {"SKILL"}, false, A_SKILL_FILTER)
+    if (nSkillEffectCount > 0) then
+        for _,v in ipairs(aSkillAddDice) do
+            table.insert(aAddDice, v)
+        end
+        nAddMod = nAddMod + nSkillAddMod;
+    end
+
+    -- Get ability modifiers
+    local nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    if nBonusEffects > 0 then
+        nAddMod = nAddMod + nBonusStat
+    end
+
+    -- Get exhaustion modifiers
+    local nExhaustMod, nExhaustCount = EffectManager5E.getEffectsBonus(nodeCreature, {"EXHAUSTION"}, true)
+    if nExhaustCount > 0 then
+        if nExhaustMod >= 1 then
+            bDIS = true
+        end
+    end
+
+    return bADV, bDIS, nAddMod
 end
 
 function getProficiencyBonus(vActor)
