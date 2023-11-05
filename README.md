@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v3.15 by Justin Freitas
+StealthTracker v3.16 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -69,5 +69,6 @@ Changelist:
 - v3.13 - No secret eye icon in chat messages, it takes too much space.  Change to the build script.  Later loading sequence to ensure new icon.
 - v3.14 - Another icon update, 42px this time.
 - v3.15 - Move the Options to be GM only to not clutter the player settings since they can't change anything anyway.  Add in any advantage and/or disadvantage in perception, wisdom, or ability adjustments to the passive perception (unaccounted for in the number already) used when detecting hiding actors.
+- v3.16 - Add an option for Frame Style (defaulting to None) to frame the StealthTracker chat output.  The options are None, Chat, Story, Whisper and they utilize the CoreRPG output modes for these selections.  Chat and Story look similar, but story is a tiny bit wider.  Whisper has the most unique look and is very obvious in the chat.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="StealthTracker v3.15 FGC/FGU 5E, 9/18/23\r2016-2023 Justin Freitas" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.16 FGC/FGU 5E, 11.5/23\r2016-2023 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.15</version>
+		<version>3.16</version>
 		<loadorder>9999</loadorder>
 		<author>Justin Freitas</author>
 		<description>Stealth tracking via effects in the Combat Tracker with related information regarding the hiding actor and who can and cannot see them.</description>
@@ -19,6 +19,7 @@
 		<string name="option_label_STEALTHTRACKER_AWARE">Chat: 'Sees Actor' verbosity</string>
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire Stealth effect</string>
 		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Ignore Stealth same faction</string>
+		<string name="option_label_STEALTHTRACKER_FRAME_STYLE">Chat: Frame style</string>
 		<string name="option_label_STEALTHTRACKER_INIT_CLEAR">CT: Remove Stealth on Init Clear</string>
 		<string name="option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH">Chat: Show summary after Stealth</string>
 		<string name="option_label_STEALTHTRACKER_VISIBLE">Chat: 'Actor Sees' verbosity</string>
@@ -29,13 +30,16 @@
 		<string name="option_val_aware_STEALTHTRACKER">Aware</string>
 		<string name="option_val_both_STEALTHTRACKER">Both</string>
 		<string name="option_val_chat_and_effects_STEALTHTRACKER">Chat and Effects</string>
+		<string name="option_val_chat_STEALTHTRACKER">Chat</string>
 		<string name="option_val_effects_STEALTHTRACKER">Effects</string>
 		<string name="option_val_hidden_STEALTHTRACKER">Hidden</string>
 		<string name="option_val_none_STEALTHTRACKER">None</string>
+		<string name="option_val_story_STEALTHTRACKER">Story</string>
 		<string name="option_val_turn_STEALTHTRACKER">Turn</string>		
 		<string name="option_val_turn_and_combat_STEALTHTRACKER">Turn and Combat</string>
 		<string name="option_val_unaware_STEALTHTRACKER">Unaware</string>
 		<string name="option_val_visible_STEALTHTRACKER">Visible</string>
+		<string name="option_val_whisper_STEALTHTRACKER">Whisper</string>
 
 		<script name="StealthTracker" file="scripts/stealthtracker.lua" />
 		<icon name="stealth_icon" file="graphics/icons/stealth_icon.png" />
