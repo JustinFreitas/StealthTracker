@@ -659,29 +659,22 @@ function getPassivePerceptionNumber(vActor)
     return modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
 end
 
-function modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
-    local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(nodeCreature)
-    local nAdvBonus = bAdv and 5 or 0
-    local nDisadvPenalty = bDisadv and -5 or 0
-    return nPP + nAdvBonus + nDisadvPenalty + nAddMod
-end
-
 function getAdvDisadvForPerception(nodeCreature)
     local bADV, bDIS = false, false
-    if EffectManager5E.hasEffectCondition(nodeCreature, "ADVSKILL") then
+    if EffectManager.hasEffect(nodeCreature, "ADVSKILL") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVSKILL", A_SKILL_FILTER)) > 0 then
         bADV = true
-    elseif EffectManager5E.hasEffectCondition(nodeCreature, "ADVCHK") then
+    elseif EffectManager.hasEffect(nodeCreature, "ADVCHK") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVCHK", A_CHECK_FILTER)) > 0 then
         bADV = true
     end
-    if EffectManager5E.hasEffectCondition(nodeCreature, "DISSKILL") then
+    if EffectManager.hasEffect(nodeCreature, "DISSKILL") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISSKILL", A_SKILL_FILTER)) > 0 then
         bDIS = true
-    elseif EffectManager5E.hasEffectCondition(nodeCreature, "DISCHK") then
+    elseif EffectManager.hasEffect(nodeCreature, "DISCHK") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISCHK", A_CHECK_FILTER)) > 0 then
         bDIS = true
@@ -964,6 +957,13 @@ end
 function isValidCTNode(nodeCT)
 	return (hasValidType(nodeCT) or isFriend(nodeCT))
             and not isStealthTrackerDisabledForActor(nodeCT)
+end
+
+function modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
+    local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(nodeCreature)
+    local nAdvBonus = bAdv and 5 or 0
+    local nDisadvPenalty = bDisadv and -5 or 0
+    return nPP + nAdvBonus + nDisadvPenalty + nAddMod
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
