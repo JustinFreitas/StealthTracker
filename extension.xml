@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 
 <root version="3.3" release="8.1|CoreRPG:4.1">
-	<announcement text="StealthTracker v3.17 FGC/FGU 5E, 6/25/24\r2016-2024 Justin Freitas" font="emotefont" icon="stealth_icon" />
+	<announcement text="StealthTracker v3.18 FGC/FGU 5E, 1/17/25\r2016-2025 Justin Freitas" font="emotefont" icon="stealth_icon" />
 	<properties>
 		<name>Feature: StealthTracker</name>
-		<version>3.17</version>
+		<version>3.18</version>
 		<loadorder>9999</loadorder>
 		<author>Justin Freitas</author>
 		<description>Stealth tracking via effects in the Combat Tracker with related information regarding the hiding actor and who can and cannot see them.</description>
@@ -20,6 +20,7 @@
 		<string name="option_label_STEALTHTRACKER_EXPIRE_EFFECT">CT: Expire Stealth effect</string>
 		<string name="option_label_STEALTHTRACKER_FACTION_FILTER">CT: Ignore Stealth same faction</string>
 		<string name="option_label_STEALTHTRACKER_FRAME_STYLE">Chat: Frame style</string>
+		<string name="option_label_STEALTHTRACKER_SHOW_EYE">Chat: Show Hidden (eye) Icon</string>
 		<string name="option_label_STEALTHTRACKER_INIT_CLEAR">CT: Remove Stealth on Init Clear</string>
 		<string name="option_label_STEALTHTRACKER_SHOW_AFTER_STEALTH">Chat: Show summary after Stealth</string>
 		<string name="option_label_STEALTHTRACKER_VISIBLE">Chat: 'Actor Sees' verbosity</string>

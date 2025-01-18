@@ -34,6 +34,7 @@ STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
 STEALTHTRACKER_FRAME_STYLE = "STEALTHTRACKER_FRAME_STYLE"
 STEALTHTRACKER_INIT_CLEAR = "STEALTHTRACKER_INIT_CLEAR"
 STEALTHTRACKER_SHOW_AFTER_STEALTH = "STEALTHTRACKER_SHOW_AFTER_STEALTH"
+STEALTHTRACKER_SHOW_EYE = "STEALTHTRACKER_SHOW_EYE"
 STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
 STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
 STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
@@ -69,6 +70,7 @@ function onInit()
         local option_header = "option_header_STEALTHTRACKER"
         local option_val_none = "option_val_none_STEALTHTRACKER"
         local option_val_off = "option_val_off"
+        local option_val_on = "option_val_on"
         local both = "both"
         local standard = "standard"
 
@@ -92,6 +94,8 @@ function onInit()
             { labels = option_val_off, values = OFF, baselabel = "option_val_on", baseval = ON, default = ON })
         OptionsManager.registerOption2(STEALTHTRACKER_FRAME_STYLE, false, option_header, "option_label_STEALTHTRACKER_FRAME_STYLE", option_entry_cycler,
             { baselabel = option_val_none, baseval = NONE, labels = "option_val_chat_STEALTHTRACKER|option_val_story_STEALTHTRACKER|option_val_whisper_STEALTHTRACKER", values = "chat|story|whisper", default = NONE })
+        OptionsManager.registerOption2(STEALTHTRACKER_SHOW_EYE, false, option_header, "option_label_STEALTHTRACKER_SHOW_EYE", option_entry_cycler,
+            { labels = option_val_on, values = ON, baselabel = "option_val_off", baseval = OFF, default = OFF })
 
             CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
@@ -186,6 +190,10 @@ function checkFGC()
 	return nMajor < 4
 end
 
+function checkShowEye()
+    return OptionsManager.isOption(STEALTHTRACKER_SHOW_EYE, ON)
+end
+
 function checkVerbosityMax()
 	return OptionsManager.isOption(STEALTHTRACKER_VERBOSE, "max")
 end
@@ -210,7 +218,7 @@ function displayChatMessage(sFormattedText, bSecret)
 	if sFormattedText == nil then return end
 
     local sMode = getMode()
-	local msg = {font = "msgfont", icon = "stealth_icon", secret = false, text = sFormattedText, mode = sMode}  -- secret true shows the cross eye icon, wasting space
+	local msg = {font = "msgfont", icon = "stealth_icon", secret = checkShowEye(), text = sFormattedText, mode = sMode}  -- secret true shows the cross eye icon, wasting space
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
