@@ -437,9 +437,9 @@ function getDefaultPassivePerception(nodeCreature)
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
-function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+function getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, bForce)
 	aOutput = validateTableOrNew(aOutput)
-	if checkAllowOutOfCombat() then
+	if checkAllowOutOfCombat() and not bForce then
 		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, "Out of combat Stealth is allowed in the options. Leaving CT stealth effects after reset.")
 		return
 	end
@@ -1124,7 +1124,7 @@ function processHostOnlySubcommands(sSubcommand)
 	-- Clear all stealth names from CT actors creature nodes.
 	if sSubcommand == "clear" then
 		local aOutput = {}
-		getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput)
+		getFormattedAndClearAllStealthTrackerDataFromCTIfAllowed(aOutput, true)
 		displayTableIfNonEmpty(aOutput, FORCE_DISPLAY)
 		return
 	end

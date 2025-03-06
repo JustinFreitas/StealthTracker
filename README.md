@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v3.18 by Justin Freitas
+StealthTracker v3.19 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -72,5 +72,6 @@ Changelist:
 - v3.16 - Add an option for Frame Style (defaulting to None) to frame the StealthTracker chat output.  The options are None, Chat, Story, Whisper and they utilize the CoreRPG output modes for these selections.  Chat and Story look similar, but story is a tiny bit wider.  Whisper has the most unique look and is very obvious in the chat.
 - v3.17 - Chat frame adjustments and a bugfix calling EffectManager5E.hasEffectCondition() which indirectly has a condition that can expire effects.  I replaced those with calls to EffectManager.hasEffect() instead, which doesn't have that side effect.
 - v3.18 - Add an option to show the hidden (eye) icon in secret chat messages.
+- v3.19 - When stealth effects are cleared from a chat command, always force the removal instead of considering the 'out of turn or combat stealth' option (which is still considered on combat initiative reset).
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
