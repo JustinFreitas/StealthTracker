@@ -44,6 +44,11 @@ UNIDENTIFIED = "(unidentified)"
 USER_ISHOST = false
 VISIBLE = "visible"
 
+-- Configuration table for stealth effects to apply to observers
+STEALTH_EFFECT_MODIFIERS = {
+    ["cloak of elvenkind"] = -5
+}
+
 A_CHECK_FILTER = {
     "wisdom"
 }
@@ -347,11 +352,16 @@ function displayTowerRoll()
 end
 
 -- Function to check if the target perceives the attacker under stealth, returning true if so and false if not.
-function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget)
-	if nAttackerStealth == nil or not rTarget then return false end
+function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rAttacker, rObserver)
+	if nAttackerStealth == nil or not rObserver then return false end
 
-	local nPPTarget = getPassivePerceptionNumber(rTarget)
-	return nPPTarget ~= nil and nPPTarget >= nAttackerStealth
+	local nPPObserver = getPassivePerceptionNumber(rObserver)
+    if nPPObserver == nil then return false end
+
+    -- Apply any modifiers from the attacker's effects acting on the observer (i.e. Cloak of Elvenkind)
+    nPPObserver = nPPObserver + getStealthEffectModifier(rAttacker)
+
+	return nPPObserver >= nAttackerStealth
 end
 
 function ensureStealthSkillExistsOnNpc(nodeCT)
@@ -461,13 +471,16 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 	local sMsgText
     local rTargetHidden = isTargetHiddenFromSource(rSource, rTarget)
 	if rTargetHidden and not rTargetHidden.hidden then
-		local sStats = string.format("(%s %s: %d, %s PP: %d)",
+        local nPPEffective, nPPMod = getPassivePerceptionWithModifier(rTarget, rSource)
+        local sPPDisplay = getFormattedPPString(nPPEffective, nPPMod)
+
+		local sStats = string.format("(%s %s: %d, %s PP: %s)",
 									 ActorManager.getDisplayName(rSource),
 									 LOCALIZED_STEALTH_ABV,
 									 nStealthSource,
 									 ActorManager.getDisplayName(rTarget),
-									 getPassivePerceptionNumber(rTarget))
-		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+									 sPPDisplay)
+		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rSource, rTarget) then
 			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
 			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
 		elseif checkVerbosityMax() then
@@ -522,6 +535,14 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                                                     sIterationActorDisplayName,
                                                     LOCALIZED_STEALTH,
                                                     rHiddenTarget.stealth)
+                        -- New logic to append PP info if modified
+                        local nBasePP = getPassivePerceptionNumber(rCurrentActor)
+                        if rHiddenTarget.sourcePP ~= nBasePP then
+                            local nMod = rHiddenTarget.sourcePP - nBasePP
+                            local sPPDisplay = getFormattedPPString(rHiddenTarget.sourcePP, nMod)
+                            sText = sText .. string.format(" [PP %s]", sPPDisplay)
+                        end
+
                         if rHiddenTarget.hidden then
                             table.insert(rStealthData.hidden, sText)
                         else
@@ -532,9 +553,12 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                     -- Check the aware/unaware, same text in each that will be rolled up in the output section below.
                     if nStealthSource ~= nil then
                         local sText = string.format("%s", sIterationActorDisplayName)
-                        local sPPText = string.format(" - PP: %d", getPassivePerceptionNumber(rIterationActor))
+
+                        local nPPEffective, nPPMod = getPassivePerceptionWithModifier(rIterationActor, rCurrentActor)
+                        local sPPDisplay = getFormattedPPString(nPPEffective, nPPMod)
+                        local sPPText = string.format(" - PP: %s", sPPDisplay)
                         local sConditionFormat = " - Condition: %s"
-                        if doesTargetPerceiveAttackerFromStealth(nStealthSource, rIterationActor) then
+                        if doesTargetPerceiveAttackerFromStealth(nStealthSource, rCurrentActor, rIterationActor) then
                             if sDebilitatingCondition == nil then
                                 table.insert(rStealthData.aware, sText .. sPPText)
                             else
@@ -731,69 +755,56 @@ function getProficiencyBonus(vActor)
     return nStatScore
 end
 
+-- Formats the PP string to include the modifier if it exists (e.g. "20 (-5)" or just "20")
+function getFormattedPPString(nPPEffective, nPPMod)
+    if nPPMod == 0 then
+        return string.format("%d", nPPEffective)
+    end
+    -- Use %+d to enforce sign display (e.g. -5 or +5)
+    return string.format("%d (%+d)", nPPEffective, nPPMod)
+end
+
+-- Calculates the effective Passive Perception of an observer against a specific subject (who may have modifiers)
+-- Returns effective PP and the modifier amount
+function getPassivePerceptionWithModifier(rObserver, rSubject)
+    local nPP = getPassivePerceptionNumber(rObserver) or 0
+    local nMod = getStealthEffectModifier(rSubject)
+    return nPP + nMod, nMod
+end
+
+local CR_PROFICIENCY_MAP = {
+    ["0"] = 2, ["1/8"] = 2, ["1/4"] = 2, ["1/2"] = 2,
+    ["1"] = 2, ["2"] = 2, ["3"] = 2, ["4"] = 2,
+    ["5"] = 3, ["6"] = 3, ["7"] = 3, ["8"] = 3,
+    ["9"] = 4, ["10"] = 4, ["11"] = 4, ["12"] = 4,
+    ["13"] = 5, ["14"] = 5, ["15"] = 5, ["16"] = 5,
+    ["17"] = 6, ["18"] = 6, ["19"] = 6, ["20"] = 6,
+    ["21"] = 7, ["22"] = 7, ["23"] = 7, ["24"] = 7,
+    ["25"] = 8, ["26"] = 8, ["27"] = 8, ["28"] = 8,
+    ["29"] = 9, ["30"] = 9
+}
+
 function getProficiencyBonusForNPCChallengeRating(nodeActor)
     local sCR = DB.getValue(nodeActor, "cr", "")
-    if sCR == "" then return 0 end
+    return CR_PROFICIENCY_MAP[sCR] or 0
+end
 
-    if     sCR == "0"
-        or sCR == "1/8"
-        or sCR == "1/4"
-        or sCR == "1/2"
-        or sCR == "1"
-        or sCR == "2"
-        or sCR == "3"
-        or sCR == "4" then
-        return 2
+function getStealthEffectModifier(vActor)
+    if not vActor then return 0 end
+
+    local rActor = ActorManager.resolveActor(vActor)
+    if not rActor then return 0 end
+
+    local nTotalMod = 0
+    for sEffectName, nMod in pairs(STEALTH_EFFECT_MODIFIERS) do
+        -- Check if the actor has the effect (case-insensitive check is handled by EffectManager implicitly or we assume standard casing?)
+        -- EffectManager5E.hasEffect is case-insensitive.
+        if EffectManager5E.hasEffect(rActor, sEffectName) then
+            nTotalMod = nTotalMod + nMod
+        end
     end
 
-    if     sCR == "5"
-        or sCR == "6"
-        or sCR == "7"
-        or sCR == "8" then
-        return 3
-    end
-
-    if     sCR == "9"
-        or sCR == "10"
-        or sCR == "11"
-        or sCR == "12" then
-        return 4
-    end
-
-    if     sCR == "13"
-        or sCR == "14"
-        or sCR == "15"
-        or sCR == "16" then
-        return 5
-    end
-
-    if     sCR == "17"
-        or sCR == "18"
-        or sCR == "19"
-        or sCR == "20" then
-        return 6
-    end
-
-    if     sCR == "21"
-        or sCR == "22"
-        or sCR == "23"
-        or sCR == "24" then
-        return 7
-    end
-
-    if     sCR == "25"
-        or sCR == "26"
-        or sCR == "27"
-        or sCR == "28" then
-        return 8
-    end
-
-    if     sCR == "29"
-        or sCR == "30" then
-        return 9
-    end
-
-    return 0
+    return nTotalMod
 end
 
 
@@ -940,6 +951,9 @@ function isTargetHiddenFromSource(rSource, rTarget)
     local nPPSource = getPassivePerceptionNumber(rSource)
 	local nStealthTarget = getStealthNumberFromEffects(rTargetCTNode)
 	if nStealthTarget ~= nil and nPPSource ~= nil then
+        -- Apply modifiers from the target (hider) to the source (observer)
+        nPPSource = nPPSource + getStealthEffectModifier(rTarget)
+
         data = {
             source = rSource,
             sourcePP = nPPSource,
