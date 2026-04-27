@@ -725,9 +725,13 @@ function getAdvDisadvForPerception(nodeCreature)
         end
         nAddMod = nAddMod + nSkillAddMod;
     end
+    local nBonusStat, nBonusEffects = 0, 0
+    if ActorManagerD20 and ActorManagerD20.getAbilityEffectsBonus then
+        nBonusStat, nBonusEffects = ActorManagerD20.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    elseif ActorManager5E and ActorManager5E.getAbilityEffectsBonus then
+        nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    end
 
-    -- Get ability modifiers
-    local nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
     if nBonusEffects > 0 then
         nAddMod = nAddMod + nBonusStat
     end
@@ -744,11 +748,12 @@ function getAdvDisadvForPerception(nodeCreature)
 end
 
 function getProficiencyBonus(vActor)
-    local sNodeType, nodeActor = ActorManager.getTypeAndNode(vActor);
     local nStatScore
-    if sNodeType == "pc" then
+    if ActorManager.isPC(vActor) then
+        local nodeActor = ActorManager.getCreatureNode(vActor);
         nStatScore = DB.getValue(nodeActor, "profbonus", 0);
     else
+        local nodeActor = ActorManager.getCTNode(vActor) or ActorManager.getCreatureNode(vActor);
         nStatScore = getProficiencyBonusForNPCChallengeRating(nodeActor) or 0;
     end
 
@@ -898,7 +903,7 @@ function isBlank(sTest)
         return false
     end
 
-    local sCooked = string.gsub(sTest, "$s+", "")
+    local sCooked = string.gsub(sTest, "%s+", "")
     if sCooked == "" then
         return true
     else
