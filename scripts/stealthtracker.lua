@@ -58,7 +58,7 @@ local _bAbilityBonusWarningLogged = false
 -- Helper to safely fetch ability bonuses from the 5E ruleset, with a one-time console warning if the API is missing.
 local function getAbilityBonusSafe(nodeActor, sAbility)
     if ActorManager5E and ActorManager5E.getAbilityBonus then
-        return getAbilityBonusSafe(nodeActor, sAbility)
+        return ActorManager5E.getAbilityBonus(nodeActor, sAbility)
     end
     
     if not _bAbilityBonusWarningLogged then
@@ -73,7 +73,7 @@ local function hasEffectSafe(rActor, sEffect)
     if EffectManager5E and EffectManager5E.hasEffect then
         return EffectManager5E.hasEffect(rActor, sEffect)
     end
-    return hasEffectSafe(rActor, sEffect)
+    return EffectManager.hasEffect(rActor, sEffect)
 end
 
 -- Helper to safely get an actor from a node/string, preferring the modern getActor method.
@@ -81,7 +81,7 @@ local function getActorSafe(v)
     if ActorManager.getActor then
         return ActorManager.getActor(v)
     end
-    return getActorSafe(v)
+    return ActorManager.resolveActor(v)
 end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
