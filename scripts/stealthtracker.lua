@@ -718,7 +718,12 @@ function getAdvDisadvForPerception(nodeCreature)
     end
 
     -- Get ability modifiers
-    local nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    local nBonusStat, nBonusEffects = 0, 0
+    if ActorManager5E.getAbilityEffectsBonus then
+        nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    elseif EffectManager5E.getAbilityBonus then
+        nBonusStat, nBonusEffects = EffectManager5E.getAbilityBonus(nodeCreature, "wisdom")
+    end
     if nBonusEffects > 0 then
         nAddMod = nAddMod + nBonusStat
     end
@@ -902,7 +907,7 @@ function isBlank(sTest)
         return false
     end
 
-    local sCooked = string.gsub(sTest, "$s+", "")
+    local sCooked = string.gsub(sTest, "%s+", "")
     if sCooked == "" then
         return true
     else
