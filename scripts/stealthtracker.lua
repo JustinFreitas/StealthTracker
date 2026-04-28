@@ -53,6 +53,36 @@ A_SKILL_FILTER = {
 }
 
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop, CombatManager_requestActivation
+local _bAbilityBonusWarningLogged = false
+
+-- Helper to safely fetch ability bonuses from the 5E ruleset, with a one-time console warning if the API is missing.
+local function getAbilityBonusSafe(nodeActor, sAbility)
+    if ActorManager5E and ActorManager5E.getAbilityBonus then
+        return ActorManager5E.getAbilityBonus(nodeActor, sAbility)
+    end
+
+    if not _bAbilityBonusWarningLogged then
+        Debug.console("StealthTracker: Warning - ActorManager5E.getAbilityBonus not found. Defaulting to +0 mod. Please check for ruleset compatibility.")
+        _bAbilityBonusWarningLogged = true
+    end
+    return 0
+end
+
+-- Helper to safely check for effects, preferring the 5E-specific EffectManager5E if available.
+local function hasEffectSafe(rActor, sEffect)
+    if EffectManager5E and EffectManager5E.hasEffect then
+        return EffectManager5E.hasEffect(rActor, sEffect)
+    end
+    return EffectManager.hasEffect(rActor, sEffect)
+end
+
+-- Helper to safely get an actor from a node/string, preferring the modern getActor method.
+local function getActorSafe(v)
+    if ActorManager.getActor then
+        return ActorManager.getActor(v)
+    end
+    return ActorManager.resolveActor(v)
+end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
@@ -118,11 +148,26 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	ActionSkill_onRoll = ActionSkill.onRoll
-	ActionSkill.onRoll = onRollSkill
+	if ActionsManager.getResultHandler then
+		ActionSkill_onRoll = ActionsManager.getResultHandler("skill")
+	end
+	if not ActionSkill_onRoll and ActionSkill then
+		ActionSkill_onRoll = ActionSkill.onRoll
+	end
+	if ActionSkill and ActionSkill.onRoll then
+		ActionSkill.onRoll = onRollSkill
+	end
 	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionAttack_onAttack = ActionAttack.onAttack
-	ActionAttack.onAttack = onRollAttack
+
+	if ActionsManager.getResultHandler then
+		ActionAttack_onAttack = ActionsManager.getResultHandler("attack")
+	end
+	if not ActionAttack_onAttack and ActionAttack then
+		ActionAttack_onAttack = ActionAttack.onAttack
+	end
+	if ActionAttack and ActionAttack.onAttack then
+		ActionAttack.onAttack = onRollAttack
+	end
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
@@ -357,11 +402,11 @@ end
 function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not nodeCT then return end
 
-	local rCurrentActor = ActorManager.resolveActor(nodeCT)
+	local rCurrentActor = getActorSafe(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, DEXTERITY)
+	local nDexMod = getAbilityBonusSafe(nodeCT, DEXTERITY)
 	local sStealthWithMod = LOCALIZED_STEALTH .. " "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -413,7 +458,7 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 end
 
 function getActorDebilitatingCondition(vActor)
-	local rActor = ActorManager.resolveActor(vActor)
+	local rActor = getActorSafe(vActor)
 	if not rActor then return nil end
 
 	local aConditions = { -- prioritized
@@ -433,7 +478,7 @@ function getActorDebilitatingCondition(vActor)
 end
 
 function getDefaultPassivePerception(nodeCreature)
-    return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
+    return 10 + getAbilityBonusSafe(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
@@ -492,7 +537,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 
     if not nodeCTSource then return rStealthData end
 
-	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
+	local rCurrentActor = getActorSafe(nodeCTSource)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
@@ -506,7 +551,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
         if isValidCTNode(nodeCT) then  -- hasValidType(nodeCT) or isFriend(nodeCT)
             -- Two checks will be needed each iteration.  One for visible/hidden and the other for aware/unaware.
-            local rIterationActor = ActorManager.resolveActor(nodeCT)
+            local rIterationActor = getActorSafe(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
                 if isBlank(sIterationActorDisplayName) or isUnidentifiedNpc(nodeCT) then
@@ -669,20 +714,20 @@ end
 
 function getAdvDisadvForPerception(nodeCreature)
     local bADV, bDIS = false, false
-    if EffectManager.hasEffect(nodeCreature, "ADVSKILL") then
+    if hasEffectSafe(nodeCreature, "ADVSKILL") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVSKILL", A_SKILL_FILTER)) > 0 then
         bADV = true
-    elseif EffectManager.hasEffect(nodeCreature, "ADVCHK") then
+    elseif hasEffectSafe(nodeCreature, "ADVCHK") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVCHK", A_CHECK_FILTER)) > 0 then
         bADV = true
     end
-    if EffectManager.hasEffect(nodeCreature, "DISSKILL") then
+    if hasEffectSafe(nodeCreature, "DISSKILL") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISSKILL", A_SKILL_FILTER)) > 0 then
         bDIS = true
-    elseif EffectManager.hasEffect(nodeCreature, "DISCHK") then
+    elseif hasEffectSafe(nodeCreature, "DISCHK") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISCHK", A_CHECK_FILTER)) > 0 then
         bDIS = true
@@ -703,7 +748,12 @@ function getAdvDisadvForPerception(nodeCreature)
     end
 
     -- Get ability modifiers
-    local nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    local nBonusStat, nBonusEffects = 0, 0
+    if ActorManager5E.getAbilityEffectsBonus then
+        nBonusStat, nBonusEffects = ActorManager5E.getAbilityEffectsBonus(nodeCreature, "wisdom")
+    elseif EffectManager5E.getAbilityBonus then
+        nBonusStat, nBonusEffects = EffectManager5E.getAbilityBonus(nodeCreature, "wisdom")
+    end
     if nBonusEffects > 0 then
         nAddMod = nAddMod + nBonusStat
     end
@@ -848,7 +898,7 @@ end
 
 -- Handler for the message to do an attack from a position of stealth.
 function handleAttackFromStealth(msgOOB)
-	displayProcessAttackFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode), ActorManager.resolveActor(msgOOB.sTargetCTNode))
+	displayProcessAttackFromStealth(getActorSafe(msgOOB.sSourceCTNode), getActorSafe(msgOOB.sTargetCTNode))
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
@@ -887,7 +937,7 @@ function isBlank(sTest)
         return false
     end
 
-    local sCooked = string.gsub(sTest, "$s+", "")
+    local sCooked = string.gsub(sTest, "%s+", "")
     if sCooked == "" then
         return true
     else
@@ -1033,9 +1083,11 @@ function onDrop(nodetype, nodename, draginfo)
 	end
 
 	local rSource = ActionsManager.decodeActors(draginfo)
-	local rTarget = ActorManager.resolveActor(nodename)
+	local rTarget = getActorSafe(nodename)
 	onDropEvent(rSource, rTarget, draginfo)
-	CombatManager_onDrop(nodetype, nodename, draginfo)
+	if CombatManager_onDrop then
+		CombatManager_onDrop(nodetype, nodename, draginfo)
+	end
 end
 
 -- Fires when something is dropped on the CT
@@ -1062,7 +1114,9 @@ function onGenericActionPostRoll(rSource, rRoll)
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
-	ActionAttack_onAttack(rSource, rTarget, rRoll)
+	if ActionAttack_onAttack then
+		ActionAttack_onAttack(rSource, rTarget, rRoll)
+	end
 
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
@@ -1090,7 +1144,9 @@ function onRollSkill(rSource, rTarget, rRoll)
 	end
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
-	ActionSkill_onRoll(rSource, rTarget, rRoll)
+	if ActionSkill_onRoll then
+		ActionSkill_onRoll(rSource, rTarget, rRoll)
+	end
 	if not bProcessStealth then return end
 
 	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
@@ -1134,7 +1190,9 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function requestActivation(nodeEntry, bSkipBell)
-    CombatManager_requestActivation(nodeEntry, bSkipBell)
+    if CombatManager_requestActivation then
+        CombatManager_requestActivation(nodeEntry, bSkipBell)
+    end
     if not isValidCTNode(nodeEntry) then return end
 
     ensureStealthSkillExistsOnNpc(nodeEntry)
