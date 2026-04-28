@@ -118,11 +118,26 @@ function onInit()
 	end
 
 	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	ActionSkill_onRoll = ActionSkill.onRoll
-	ActionSkill.onRoll = onRollSkill
+	if ActionsManager.getResultHandler then
+		ActionSkill_onRoll = ActionsManager.getResultHandler("skill")
+	end
+	if not ActionSkill_onRoll and ActionSkill then
+		ActionSkill_onRoll = ActionSkill.onRoll
+	end
+	if ActionSkill and ActionSkill.onRoll then
+		ActionSkill.onRoll = onRollSkill
+	end
 	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionAttack_onAttack = ActionAttack.onAttack
-	ActionAttack.onAttack = onRollAttack
+
+	if ActionsManager.getResultHandler then
+		ActionAttack_onAttack = ActionsManager.getResultHandler("attack")
+	end
+	if not ActionAttack_onAttack and ActionAttack then
+		ActionAttack_onAttack = ActionAttack.onAttack
+	end
+	if ActionAttack and ActionAttack.onAttack then
+		ActionAttack.onAttack = onRollAttack
+	end
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
