@@ -1035,7 +1035,9 @@ function onDrop(nodetype, nodename, draginfo)
 	local rSource = ActionsManager.decodeActors(draginfo)
 	local rTarget = ActorManager.resolveActor(nodename)
 	onDropEvent(rSource, rTarget, draginfo)
-	CombatManager_onDrop(nodetype, nodename, draginfo)
+	if CombatManager_onDrop then
+		CombatManager_onDrop(nodetype, nodename, draginfo)
+	end
 end
 
 -- Fires when something is dropped on the CT
@@ -1062,7 +1064,9 @@ function onGenericActionPostRoll(rSource, rRoll)
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
-	ActionAttack_onAttack(rSource, rTarget, rRoll)
+	if ActionAttack_onAttack then
+		ActionAttack_onAttack(rSource, rTarget, rRoll)
+	end
 
 	-- When attacks are rolled in the tower, the target is always nil.
 	if not rTarget and rRoll.bSecret then
@@ -1090,7 +1094,9 @@ function onRollSkill(rSource, rTarget, rRoll)
 	end
 
 	-- Call the default action that happens when a skill roll occurs in the ruleset.
-	ActionSkill_onRoll(rSource, rTarget, rRoll)
+	if ActionSkill_onRoll then
+		ActionSkill_onRoll(rSource, rTarget, rRoll)
+	end
 	if not bProcessStealth then return end
 
 	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
@@ -1134,7 +1140,9 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function requestActivation(nodeEntry, bSkipBell)
-    CombatManager_requestActivation(nodeEntry, bSkipBell)
+    if CombatManager_requestActivation then
+        CombatManager_requestActivation(nodeEntry, bSkipBell)
+    end
     if not isValidCTNode(nodeEntry) then return end
 
     ensureStealthSkillExistsOnNpc(nodeEntry)
