@@ -60,7 +60,7 @@ local function getAbilityBonusSafe(nodeActor, sAbility)
     if ActorManager5E and ActorManager5E.getAbilityBonus then
         return ActorManager5E.getAbilityBonus(nodeActor, sAbility)
     end
-    
+
     if not _bAbilityBonusWarningLogged then
         Debug.console("StealthTracker: Warning - ActorManager5E.getAbilityBonus not found. Defaulting to +0 mod. Please check for ruleset compatibility.")
         _bAbilityBonusWarningLogged = true
