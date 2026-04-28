@@ -53,6 +53,20 @@ A_SKILL_FILTER = {
 }
 
 local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop, CombatManager_requestActivation
+local _bAbilityBonusWarningLogged = false
+
+-- Helper to safely fetch ability bonuses from the 5E ruleset, with a one-time console warning if the API is missing.
+local function getAbilityBonusSafe(nodeActor, sAbility)
+    if ActorManager5E and ActorManager5E.getAbilityBonus then
+        return getAbilityBonusSafe(nodeActor, sAbility)
+    end
+    
+    if not _bAbilityBonusWarningLogged then
+        Debug.console("StealthTracker: Warning - ActorManager5E.getAbilityBonus not found. Defaulting to +0 mod. Please check for ruleset compatibility.")
+        _bAbilityBonusWarningLogged = true
+    end
+    return 0
+end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
@@ -376,7 +390,7 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = ActorManager5E.getAbilityBonus(nodeCT, DEXTERITY)
+	local nDexMod = getAbilityBonusSafe(nodeCT, DEXTERITY)
 	local sStealthWithMod = LOCALIZED_STEALTH .. " "
 	if nDexMod >= 0 then
 		sStealthWithMod = sStealthWithMod .. "+"
@@ -448,7 +462,7 @@ function getActorDebilitatingCondition(vActor)
 end
 
 function getDefaultPassivePerception(nodeCreature)
-    return 10 + ActorManager5E.getAbilityBonus(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
+    return 10 + getAbilityBonusSafe(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
