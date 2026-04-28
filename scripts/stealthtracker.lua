@@ -68,6 +68,22 @@ local function getAbilityBonusSafe(nodeActor, sAbility)
     return 0
 end
 
+-- Helper to safely check for effects, preferring the 5E-specific EffectManager5E if available.
+local function hasEffectSafe(rActor, sEffect)
+    if EffectManager5E and EffectManager5E.hasEffect then
+        return EffectManager5E.hasEffect(rActor, sEffect)
+    end
+    return hasEffectSafe(rActor, sEffect)
+end
+
+-- Helper to safely get an actor from a node/string, preferring the modern getActor method.
+local function getActorSafe(v)
+    if ActorManager.getActor then
+        return ActorManager.getActor(v)
+    end
+    return getActorSafe(v)
+end
+
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	IS_FGC = checkFGC()
@@ -386,7 +402,7 @@ end
 function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not nodeCT then return end
 
-	local rCurrentActor = ActorManager.resolveActor(nodeCT)
+	local rCurrentActor = getActorSafe(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
 	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
@@ -442,7 +458,7 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 end
 
 function getActorDebilitatingCondition(vActor)
-	local rActor = ActorManager.resolveActor(vActor)
+	local rActor = getActorSafe(vActor)
 	if not rActor then return nil end
 
 	local aConditions = { -- prioritized
@@ -521,7 +537,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 
     if not nodeCTSource then return rStealthData end
 
-	local rCurrentActor = ActorManager.resolveActor(nodeCTSource)
+	local rCurrentActor = getActorSafe(nodeCTSource)
 	if not rCurrentActor then return rStealthData end
 
     local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
@@ -535,7 +551,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	for _, nodeCT in ipairs(lCombatTrackerActors) do
         if isValidCTNode(nodeCT) then  -- hasValidType(nodeCT) or isFriend(nodeCT)
             -- Two checks will be needed each iteration.  One for visible/hidden and the other for aware/unaware.
-            local rIterationActor = ActorManager.resolveActor(nodeCT)
+            local rIterationActor = getActorSafe(nodeCT)
             if rIterationActor then
                 local sIterationActorDisplayName = ActorManager.getDisplayName(rIterationActor)
                 if isBlank(sIterationActorDisplayName) or isUnidentifiedNpc(nodeCT) then
@@ -698,20 +714,20 @@ end
 
 function getAdvDisadvForPerception(nodeCreature)
     local bADV, bDIS = false, false
-    if EffectManager.hasEffect(nodeCreature, "ADVSKILL") then
+    if hasEffectSafe(nodeCreature, "ADVSKILL") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVSKILL", A_SKILL_FILTER)) > 0 then
         bADV = true
-    elseif EffectManager.hasEffect(nodeCreature, "ADVCHK") then
+    elseif hasEffectSafe(nodeCreature, "ADVCHK") then
         bADV = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "ADVCHK", A_CHECK_FILTER)) > 0 then
         bADV = true
     end
-    if EffectManager.hasEffect(nodeCreature, "DISSKILL") then
+    if hasEffectSafe(nodeCreature, "DISSKILL") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISSKILL", A_SKILL_FILTER)) > 0 then
         bDIS = true
-    elseif EffectManager.hasEffect(nodeCreature, "DISCHK") then
+    elseif hasEffectSafe(nodeCreature, "DISCHK") then
         bDIS = true
     elseif #(EffectManager5E.getEffectsByType(nodeCreature, "DISCHK", A_CHECK_FILTER)) > 0 then
         bDIS = true
@@ -882,7 +898,7 @@ end
 
 -- Handler for the message to do an attack from a position of stealth.
 function handleAttackFromStealth(msgOOB)
-	displayProcessAttackFromStealth(ActorManager.resolveActor(msgOOB.sSourceCTNode), ActorManager.resolveActor(msgOOB.sTargetCTNode))
+	displayProcessAttackFromStealth(getActorSafe(msgOOB.sSourceCTNode), getActorSafe(msgOOB.sTargetCTNode))
 end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
@@ -1067,7 +1083,7 @@ function onDrop(nodetype, nodename, draginfo)
 	end
 
 	local rSource = ActionsManager.decodeActors(draginfo)
-	local rTarget = ActorManager.resolveActor(nodename)
+	local rTarget = getActorSafe(nodename)
 	onDropEvent(rSource, rTarget, draginfo)
 	if CombatManager_onDrop then
 		CombatManager_onDrop(nodetype, nodename, draginfo)
