@@ -744,11 +744,12 @@ function getAdvDisadvForPerception(nodeCreature)
 end
 
 function getProficiencyBonus(vActor)
-    local sNodeType, nodeActor = ActorManager.getTypeAndNode(vActor);
     local nStatScore
-    if sNodeType == "pc" then
+    if ActorManager.isPC(vActor) then
+        local nodeActor = ActorManager.getCreatureNode(vActor);
         nStatScore = DB.getValue(nodeActor, "profbonus", 0);
     else
+        local nodeActor = ActorManager.getCTNode(vActor) or ActorManager.getCreatureNode(vActor);
         nStatScore = getProficiencyBonusForNPCChallengeRating(nodeActor) or 0;
     end
 
