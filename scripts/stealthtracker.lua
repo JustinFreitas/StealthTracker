@@ -57,7 +57,7 @@ A_SKILL_FILTER = {
     "wisdom"
 }
 
-local ActionSkill_onRoll, ActionAttack_onAttack, CombatManager_onDrop, CombatManager_requestActivation
+local ActionSkill_onRoll_Ruleset, ActionAttack_onAttack_Ruleset, ActionSkill_onRoll_Original, CombatManager_onDrop, CombatManager_requestActivation
 local _bAbilityBonusWarningLogged = false
 
 -- Helper to safely check if a string is blank, preferring the modern StringManager method.
@@ -148,6 +148,17 @@ function onInit()
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
 	USER_ISHOST = User.isHost()
 
+    -- Initiation hook (for forcing secret rolls)
+    if ActionSkill then
+        ActionSkill_onRoll_Original = ActionSkill.onRoll
+        ActionSkill.onRoll = onInitiateSkill
+    end
+
+    -- Capture ruleset result handlers from ActionsManager (Host and Client)
+    -- This ensures we get the actual local functions even if they aren't in the global table.
+    ActionSkill_onRoll_Ruleset = ActionsManager.getResultHandler("skill")
+    ActionAttack_onAttack_Ruleset = ActionsManager.getResultHandler("attack")
+
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
         local option_entry_cycler = "option_entry_cycler"
@@ -201,12 +212,8 @@ function onInit()
 		Comm.registerSlashHandler("stealth", processChatCommand)
 	end
 
-	-- Unlike the Custom Turn and Init events above, the dice result handler must be registered on host and client.
-	ActionSkill_onRoll = ActionSkill.onRoll
-	ActionSkill.onRoll = onRollSkill
+	-- Register our handlers globally via ActionsManager
 	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionAttack_onAttack = ActionAttack.onAttack
-	ActionAttack.onAttack = onRollAttack
 	ActionsManager.registerResultHandler("attack", onRollAttack)
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
@@ -379,7 +386,14 @@ end
 function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
 	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
-		-- Calculate the stealth roll so that it's available to put in the creature effects.  Advantage already decoded when coming from a 5E ruleset Stealth roll.
+        -- Explicitly decode advantage/disadvantage using 5E-specific managers to ensure we don't just sum all dice.
+        if ActionD20 and ActionD20.decodeAdvantage then
+            ActionD20.decodeAdvantage(rRoll)
+        elseif ActionsManager2 and ActionsManager2.decodeAdvantage then
+            ActionsManager2.decodeAdvantage(rRoll)
+        end
+
+		-- Calculate the stealth roll so that it's available to put in the creature effects.
 		local nStealthTotal = ActionsManager.total(rRoll)
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if USER_ISHOST then
@@ -857,8 +871,7 @@ function getProficiencyBonusForNPCChallengeRating(nodeActor)
 
     if     sCR == "21"
         or sCR == "22"
-        or sCR == "23"
-        or sCR == "24" then
+        or sCR == "23" or sCR == "24" then
         return 7
     end
 
@@ -1094,7 +1107,7 @@ function onDrop(nodetype, nodename, draginfo)
 	local rSource = ActionsManager.decodeActors(draginfo)
 	local rTarget = getActorSafe(nodename)
 	onDropEvent(rSource, rTarget, draginfo)
-    if CombatManager_onDrop then
+    if type(CombatManager_onDrop) == "function" then
 	    CombatManager_onDrop(nodetype, nodename, draginfo)
     end
 end
@@ -1117,14 +1130,30 @@ end
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
 	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == GENACTROLL and rRoll.sGenericAction == "Hide" then
-		ActionsManager2.decodeAdvantage(rRoll) -- this is done automatically for ruleset (i.e. Stealth) rolls
 		displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	end
 end
 
+function onInitiateSkill(rSource, rTarget, rRoll)
+	local bProcessStealth = rSource and rRoll and isStealthSkillRoll(rRoll.sDesc)
+
+	-- If we are processing stealth, update the roll display to remove any existing stealth info.
+	if bProcessStealth then
+		if isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(rSource)) then
+			rRoll.bSecret = true
+		end
+	end
+
+    -- Call the ruleset's initiation handler.
+    if type(ActionSkill_onRoll_Original) == "function" then
+	    ActionSkill_onRoll_Original(rSource, rTarget, rRoll)
+    end
+end
+
 function onRollAttack(rSource, rTarget, rRoll)
-    if ActionAttack_onAttack then
-	    ActionAttack_onAttack(rSource, rTarget, rRoll)
+    -- Passthrough to ruleset handler
+    if type(ActionAttack_onAttack_Ruleset) == "function" then
+	    ActionAttack_onAttack_Ruleset(rSource, rTarget, rRoll)
     end
 
 	-- When attacks are rolled in the tower, the target is always nil.
@@ -1135,30 +1164,17 @@ function onRollAttack(rSource, rTarget, rRoll)
 	displayProcessAttackFromStealth(rSource, rTarget)
 end
 
--- NOTE: The roll handler runs on whatever system throws the dice, so it does run on the clients... unlike the way the CT events are wired up to the host only (in onInit()).
--- This is the handler that we wire up to override the default roll handler.  We can do our logic, then call the stored action handler (via onInit()), and finally finish up with more logic.
+-- This is the handler that we wire up to override the default roll handler.
 function onRollSkill(rSource, rTarget, rRoll)
-	-- Check the arguments used in this function.  Only process stealth if both are populated.  Never return prior to calling the default handler from the ruleset (below, ActionSkill_onRoll(rSource, rTarget, rRoll))
-	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
-
-	-- If we are processing stealth, update the roll display to remove any existing stealth info.
-	if bProcessStealth then
-		-- For PCs, sCreatureNode is their character sheet node.  For NPCs, it's the CT node (i.e. same as sCTNode).
-		-- This is important because when the game loads, the CT node name for PCs is lost... it's reloaded from their character sheet node on initialization.
-		-- This isn't the case for NPCs, which retain their modified name on game load.
-		-- Check to see if the current actor is a npc and not visible.  If so, make the roll as secret/tower.
-		if isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(rSource)) then
-			rRoll.bSecret = true
-		end
-	end
-
-	-- Call the default action that happens when a skill roll occurs in the ruleset.
-    if ActionSkill_onRoll then
-	    ActionSkill_onRoll(rSource, rTarget, rRoll)
+	-- Passthrough to ruleset handler
+    if type(ActionSkill_onRoll_Ruleset) == "function" then
+	    ActionSkill_onRoll_Ruleset(rSource, rTarget, rRoll)
     end
-	if not bProcessStealth then return end
 
-	displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
+	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
+	if bProcessStealth then
+	    displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
+    end
 end
 
 -- Handler for the 'st' and 'stealthtracker' slash commands in chat.
@@ -1199,7 +1215,7 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function requestActivation(nodeEntry, bSkipBell)
-    if CombatManager_requestActivation then
+    if type(CombatManager_requestActivation) == "function" then
         CombatManager_requestActivation(nodeEntry, bSkipBell)
     end
     if not isValidCTNode(nodeEntry) then return end
