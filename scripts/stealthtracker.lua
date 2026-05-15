@@ -996,6 +996,11 @@ function isStealthSkillRoll(sRollData)
 	return sRollData and sRollData:lower():match("%[skill%] " .. LOCALIZED_STEALTH_LOWER)
 end
 
+-- Checks to see if the roll description (or drag info data) is a dexterity check roll.
+function isDexterityCheckRoll(sRollData)
+	return sRollData and sRollData:lower():match("%[check%] " .. LOCALIZED_DEXTERITY_LOWER)
+end
+
 function isStealthTrackerDisabledForActor(nodeCTActor)
     return nodeCTActor and DB.getText(nodeCTActor, "senses", ""):lower():match("no stealthtracker")
 end
