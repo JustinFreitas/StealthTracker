@@ -9,3 +9,4 @@ build/out/StealthTracker.zip
 build/out/StealthTracker.ext
 build/out/StealthTracker4e.ext
 scripts/luacheck.exe
+.claude/
