@@ -225,7 +225,7 @@ end
 -- Alphebetical list of functions below (onInit() above was an exception)
 
 function booleanToNumber(bValue)
-	return bValue == true and 1 or bValue == false and 0
+	return bValue and 1 or 0
 end
 
 function checkAllowOutOfCombat()
@@ -273,7 +273,7 @@ function checkExpireNone()
 end
 
 function checkFactionFilter()
-	return OptionsManager.getOption(STEALTHTRACKER_FACTION_FILTER) == ON
+	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
 end
 
 function checkFGC()
@@ -530,8 +530,14 @@ function getActorDebilitatingCondition(vActor)
 	return nil
 end
 
+-- Fallback passive Perception used only when it can't be read from the sheet (PC) or the NPC 'senses' field.
+-- Per 5e RAW (both 2014 and 2024), passive Perception = 10 + Wisdom (Perception) check modifier, where
+-- proficiency is only included if the creature is actually proficient in Perception.  A bare NPC stat block
+-- that reaches this fallback has no listed Perception proficiency, so we use 10 + Wis mod and avoid the
+-- previous behavior of unconditionally adding the full proficiency bonus (which over-stated PP for
+-- non-proficient creatures and made hidden actors easier to detect).
 function getDefaultPassivePerception(nodeCreature)
-    return 10 + getAbilityBonusSafe(nodeCreature, "wisdom") + getProficiencyBonus(nodeCreature)
+    return 10 + getAbilityBonusSafe(nodeCreature, "wisdom")
 end
 
 -- Function that walks the CT nodes and deletes the stealth effects from them.
@@ -593,7 +599,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
 	local rCurrentActor = getActorSafe(nodeCTSource)
 	if not rCurrentActor then return rStealthData end
 
-    local sCTSourceDisplayName = ActorManager.getDisplayName(nodeCTSource)
+    local sCTSourceDisplayName = ActorManager.getDisplayName(rCurrentActor)
     if isBlankSafe(sCTSourceDisplayName) or isUnidentifiedNpc(nodeCTSource) then
         sCTSourceDisplayName = getUnidentifiedName(nodeCTSource)
     end
@@ -689,7 +695,10 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
         end
     end
 
-    if OptionsManager.getOption(STEALTHTRACKER_AWARE) ~= NONE then
+    -- The aware/unaware summary only makes sense when the source has a stealth value; guarding here also
+    -- ensures nStealthSource is non-nil for the %d formatting below (rStealthData.aware/unaware are only
+    -- populated under that same condition during the CT walk above).
+    if nStealthSource ~= nil and OptionsManager.getOption(STEALTHTRACKER_AWARE) ~= NONE then
         if OptionsManager.getOption(STEALTHTRACKER_AWARE) ~= UNAWARE then
             if #rStealthData.aware > 0 then
                 -- Now, let's display a summary message and append the output strings from above appended to the end.
@@ -700,7 +709,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                                             table.concat(rStealthData.aware, "\r"))
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
             else
-                if nStealthSource ~= nil and checkVerbosityMax() then
+                if checkVerbosityMax() then
                     local sText = string.format("There are no actors that can see %s.",
                                                 sCTSourceDisplayName)
                     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
@@ -718,7 +727,7 @@ function getFormattedStealthDataFromCT(nodeCTSource, aOutput)
                                             table.concat(rStealthData.unaware, "\r"))
                 insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
             else
-                if nStealthSource ~= nil and checkVerbosityMax() then
+                if checkVerbosityMax() then
                     local sText = string.format("There are no actors unaware of %s.",
                                                 sCTSourceDisplayName)
                     insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
@@ -806,10 +815,17 @@ function getAdvDisadvForPerception(nodeCreature)
         nAddMod = nAddMod + nBonusStat
     end
 
-    -- Get exhaustion modifiers
-    local nExhaustMod, nExhaustCount = getEffectsBonusSafe(nodeCreature, {"EXHAUSTION"}, true)
-    if nExhaustCount > 0 then
-        if nExhaustMod >= 1 then
+    -- Exhaustion handling, presence-driven and FGC/FGU aware (we never interpret the effect's numeric value,
+    -- whose meaning differs by edition).  FGC only ever runs the 2014 ruleset, where exhaustion imposes
+    -- disadvantage on ability checks; FG resolves that at roll time and emits no detectable DIS* effect for
+    -- passive computation, so on FGC we set the disadvantage flag ourselves when any EXHAUSTION effect is
+    -- present.  On FGU the loaded ruleset may be 2014 or 2024 (2024 replaces disadvantage with a flat
+    -- -2/level penalty that arrives through the CHECK channel summed above); rather than guess the edition we
+    -- defer to whatever that ruleset surfaces through the effect channels and do not assert disadvantage here,
+    -- which avoids double-counting the 2024 penalty.
+    if IS_FGC then
+        local _, _, nExhaustCount = getEffectsBonusSafe(nodeCreature, {"EXHAUSTION"}, true)
+        if nExhaustCount > 0 then
             bDIS = true
         end
     end

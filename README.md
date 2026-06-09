@@ -73,5 +73,6 @@ Changelist:
 - v3.17 - Chat frame adjustments and a bugfix calling EffectManager5E.hasEffectCondition() which indirectly has a condition that can expire effects.  I replaced those with calls to EffectManager.hasEffect() instead, which doesn't have that side effect.
 - v3.18 - Add an option to show the hidden (eye) icon in secret chat messages.
 - v3.19 - When stealth effects are cleared from a chat command, always force the removal instead of considering the 'out of turn or combat stealth' option (which is still considered on combat initiative reset).
+- v5.3 - Correctness fixes: default passive Perception fallback no longer unconditionally adds the proficiency bonus (now 10 + Wisdom mod per 5e RAW, so non-proficient creatures are no longer over-detected); hardened booleanToNumber against non-boolean input; guarded the aware/unaware summary against a nil source stealth value; use the resolved actor for the source display name for consistency; use isOption() for the faction filter check.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
