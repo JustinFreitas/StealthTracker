@@ -138,6 +138,20 @@ local function getTypeAndNodeSafe(v)
     return ActorManager.getActorTypeAndNode(v)
 end
 
+-- Helper to safely capture the ruleset's existing result handler for a roll type.
+-- ActionsManager.getResultHandler exists in FGU but not FGC, so fall back to the
+-- internal handler table on classic before defaulting to nil.
+local function getResultHandlerSafe(sType)
+    if ActionsManager.getResultHandler then
+        return ActionsManager.getResultHandler(sType)
+    end
+    local aHandlers = ActionsManager.aRollHandlers or ActionsManager.aHandlers
+    if type(aHandlers) == "table" and type(aHandlers[sType]) == "table" then
+        return aHandlers[sType].fResultHandler
+    end
+    return nil
+end
+
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	IS_FGC = checkFGC()
@@ -156,8 +170,8 @@ function onInit()
 
     -- Capture ruleset result handlers from ActionsManager (Host and Client)
     -- This ensures we get the actual local functions even if they aren't in the global table.
-    ActionSkill_onRoll_Ruleset = ActionsManager.getResultHandler("skill")
-    ActionAttack_onAttack_Ruleset = ActionsManager.getResultHandler("attack")
+    ActionSkill_onRoll_Ruleset = getResultHandlerSafe("skill")
+    ActionAttack_onAttack_Ruleset = getResultHandlerSafe("attack")
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
