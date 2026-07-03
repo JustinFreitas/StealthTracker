@@ -154,7 +154,6 @@ end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	IS_FGC = checkFGC()
 	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
@@ -290,10 +289,7 @@ function checkFactionFilter()
 	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
 end
 
-function checkFGC()
-	local nMajor = Interface.getVersion()
-	return nMajor < 4
-end
+
 
 function checkShowEye()
     return OptionsManager.getOption(STEALTHTRACKER_SHOW_EYE) == ON
@@ -837,12 +833,7 @@ function getAdvDisadvForPerception(nodeCreature)
     -- -2/level penalty that arrives through the CHECK channel summed above); rather than guess the edition we
     -- defer to whatever that ruleset surfaces through the effect channels and do not assert disadvantage here,
     -- which avoids double-counting the 2024 penalty.
-    if IS_FGC then
-        local _, _, nExhaustCount = getEffectsBonusSafe(nodeCreature, {"EXHAUSTION"}, true)
-        if nExhaustCount > 0 then
-            bDIS = true
-        end
-    end
+
 
     return bADV, bDIS, nAddMod
 end
@@ -1123,21 +1114,7 @@ function onCombatResetEvent()
 end
 
 function onDrop(nodetype, nodename, draginfo)
-	-- I don't know why this weird hack is needed, but it prevents the drop from firing twice.  It is FGC only.
-	if IS_FGC then
-		if LAST_DRAG_INFO == draginfo and
-		   LAST_NODE_NAME == nodename and
-		   LAST_NODE_TYPE == nodetype then
-			LAST_DRAG_INFO = nil
-			LAST_NODE_NAME = nil
-			LAST_NODE_TYPE = nil
-			return
-		end
 
-		LAST_DRAG_INFO = draginfo
-		LAST_NODE_NAME = nodename
-		LAST_NODE_TYPE = nodetype
-	end
 
 	local rSource = ActionsManager.decodeActors(draginfo)
 	local rTarget = getActorSafe(nodename)
