@@ -10,3 +10,4 @@ build/out/StealthTracker.ext
 build/out/StealthTracker4e.ext
 scripts/luacheck.exe
 .claude/
+node_modules/
