@@ -11,7 +11,7 @@ EFFECTS = "effects"
 FORCE_DISPLAY = true
 GENACTROLL = "genactroll"
 HIDDEN = "hidden"
-IS_FGC = false
+IS_FGC = true
 LAST_DRAG_INFO = nil
 LAST_NODE_NAME = nil
 LAST_NODE_TYPE = nil
@@ -154,7 +154,6 @@ end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
-	IS_FGC = checkFGC()
 	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
@@ -290,10 +289,7 @@ function checkFactionFilter()
 	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
 end
 
-function checkFGC()
-	local nMajor = Interface.getVersion()
-	return nMajor < 4
-end
+
 
 function checkShowEye()
     return OptionsManager.getOption(STEALTHTRACKER_SHOW_EYE) == ON
