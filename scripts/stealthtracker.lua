@@ -4,61 +4,62 @@
 			TokenManager2.onHover(tokenMap, nodeCT, bOver);
 		end
 --]]
-ALL = "all"
-AWARE = "aware"
-DEXTERITY = "dexterity"
-EFFECTS = "effects"
-FORCE_DISPLAY = true
-GENACTROLL = "genactroll"
-HIDDEN = "hidden"
-IS_FGC = false
-LAST_DRAG_INFO = nil
-LAST_NODE_NAME = nil
-LAST_NODE_TYPE = nil
-LOCALIZED_DEXTERITY = "Dexterity"
-LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
-LOCALIZED_STEALTH = "Stealth"
-LOCALIZED_STEALTH_ABV = "S"
-LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
-NONE = "none"
-OFF = "off"
-ON = "on"
-OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
-OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
-SECRET = true
-ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
-STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
-STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
-STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
-STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
-STEALTHTRACKER_FRAME_STYLE = "STEALTHTRACKER_FRAME_STYLE"
-STEALTHTRACKER_INIT_CLEAR = "STEALTHTRACKER_INIT_CLEAR"
-STEALTHTRACKER_SHOW_AFTER_STEALTH = "STEALTHTRACKER_SHOW_AFTER_STEALTH"
-STEALTHTRACKER_SHOW_EYE = "STEALTHTRACKER_SHOW_EYE"
-STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
-STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
-STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
-TURN = "turn"
-UNAWARE = "unaware"
-UNIDENTIFIED = "(unidentified)"
-USER_ISHOST = false
-VISIBLE = "visible"
+local ALL = "all"
+local AWARE = "aware"
+local DEXTERITY = "dexterity"
+local EFFECTS = "effects"
+local FORCE_DISPLAY = true
+local GENACTROLL = "genactroll"
+local HIDDEN = "hidden"
+local IS_FGC = false
+local LAST_DRAG_INFO = nil
+local LAST_NODE_NAME = nil
+local LAST_NODE_TYPE = nil
+local LOCALIZED_DEXTERITY = "Dexterity"
+local LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
+local LOCALIZED_STEALTH = "Stealth"
+local LOCALIZED_STEALTH_ABV = "S"
+local LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
+local NONE = "none"
+local OFF = "off"
+local ON = "on"
+local OOB_MSGTYPE_UPDATESTEALTH = "updatestealth"
+local OOB_MSGTYPE_ATTACKFROMSTEALTH = "attackfromstealth"
+local SECRET = true
+local ST_STEALTH_DISABLED_OUT_OF_FORMAT = "Stealth processing disabled when out of %s."
+local STEALTHTRACKER_ALLOW_OUT_OF = "STEALTHTRACKER_ALLOW_OUT_OF"
+local STEALTHTRACKER_AWARE = "STEALTHTRACKER_AWARE"
+local STEALTHTRACKER_EXPIRE_EFFECT = "STEALTHTRACKER_EXPIRE_EFFECT"
+local STEALTHTRACKER_FACTION_FILTER = "STEALTHTRACKER_FACTION_FILTER"
+local STEALTHTRACKER_FRAME_STYLE = "STEALTHTRACKER_FRAME_STYLE"
+local STEALTHTRACKER_INIT_CLEAR = "STEALTHTRACKER_INIT_CLEAR"
+local STEALTHTRACKER_SHOW_AFTER_STEALTH = "STEALTHTRACKER_SHOW_AFTER_STEALTH"
+local STEALTHTRACKER_SHOW_EYE = "STEALTHTRACKER_SHOW_EYE"
+local STEALTHTRACKER_VERBOSE = "STEALTHTRACKER_VERBOSE"
+local STEALTHTRACKER_VISIBLE = "STEALTHTRACKER_VISIBLE"
+local STEALTHTRACKER_VISIBILITY = "STEALTHTRACKER_VISIBILITY"
+local TURN = "turn"
+local UNAWARE = "unaware"
+local UNIDENTIFIED = "(unidentified)"
+local USER_ISHOST = false
+local VISIBLE = "visible"
 
 -- Configuration table for stealth effects to apply to observers
-STEALTH_EFFECT_MODIFIERS = {
+local STEALTH_EFFECT_MODIFIERS = {
     ["cloak of elvenkind"] = -5
 }
 
-A_CHECK_FILTER = {
+local A_CHECK_FILTER = {
     "wisdom"
 }
-A_SKILL_FILTER = {
+local A_SKILL_FILTER = {
     "perception",
     "wisdom"
 }
 
 local ActionSkill_onRoll_Ruleset, ActionAttack_onAttack_Ruleset, ActionSkill_onRoll_Original, CombatManager_onDrop, CombatManager_requestActivation
 local _bAbilityBonusWarningLogged = false
+local bStealthTrackerInitialized = false
 
 -- Helper to safely check if a string is blank, preferring the modern StringManager method.
 local function isBlankSafe(s)
@@ -154,6 +155,12 @@ end
 
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
+	-- Guard against onInit() running more than once in the same session (e.g. a script/extension
+	-- reload during development), which would chain our observers onto themselves and produce
+	-- duplicate processing.
+	if bStealthTrackerInitialized then return end
+	bStealthTrackerInitialized = true
+
 	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
@@ -166,11 +173,6 @@ function onInit()
         ActionSkill_onRoll_Original = ActionSkill.onRoll
         ActionSkill.onRoll = onInitiateSkill
     end
-
-    -- Capture ruleset result handlers from ActionsManager (Host and Client)
-    -- This ensures we get the actual local functions even if they aren't in the global table.
-    ActionSkill_onRoll_Ruleset = getResultHandlerSafe("skill")
-    ActionAttack_onAttack_Ruleset = getResultHandlerSafe("attack")
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -225,9 +227,59 @@ function onInit()
 		Comm.registerSlashHandler("stealth", processChatCommand)
 	end
 
-	-- Register our handlers globally via ActionsManager
-	ActionsManager.registerResultHandler("skill", onRollSkill)
-	ActionsManager.registerResultHandler("attack", onRollAttack)
+	-- Observe roll resolution AFTER the ruleset's own result handler has run, via CoreRPG's
+	-- GameManager "onActionPostResolve" layered hook. We deliberately do NOT replace the registered
+	-- result handlers to prevent stack overflows and swallowed rolls.
+	if GameManager and GameManager.setMultiKeyFunction and GameManager.getMultiKeyFunction then
+		local aRollTypes = { "skill", "attack" }
+		for _, sType in ipairs(aRollTypes) do
+			local fObserver = (sType == "attack") and onRollAttack or onRollSkill
+			local fPrevious = GameManager.getMultiKeyFunction("onActionPostResolve", sType)
+			GameManager.setMultiKeyFunction("onActionPostResolve", sType, function(rSource, rTarget, rRoll)
+				if fPrevious then
+					local bPrevStatus, sPrevError = pcall(fPrevious, rSource, rTarget, rRoll)
+					if not bPrevStatus and Debug and Debug.console then
+						Debug.console("StealthTracker previous hook error: " .. tostring(sPrevError))
+					end
+				end
+				local bStatus, sError = pcall(fObserver, rSource, rTarget, rRoll)
+				if not bStatus and Debug and Debug.console then
+					Debug.console("StealthTracker observer error: " .. tostring(sError))
+				end
+			end)
+		end
+	else
+		-- Fallback for CoreRPG versions without the GameManager layered hooks.
+		local aOwnWrappers = {}
+		local fSkillFallback = getResultHandlerSafe("skill")
+		local fAttackFallback = getResultHandlerSafe("attack")
+		local aRollTypes = { "skill", "attack" }
+		for _, sType in ipairs(aRollTypes) do
+			local bAttack = (sType == "attack")
+			local fObserver = bAttack and onRollAttack or onRollSkill
+			local fOriginal = getResultHandlerSafe(sType)
+			if not fOriginal then
+				fOriginal = bAttack and fAttackFallback or fSkillFallback
+			end
+			if fOriginal and aOwnWrappers[fOriginal] then
+				if Debug and Debug.console then
+					Debug.console("StealthTracker: refused self-capture of result handler for roll type: " .. sType)
+				end
+				fOriginal = nil
+			end
+			local fWrapper = function(rSource, rTarget, rRoll)
+				if fOriginal then
+					fOriginal(rSource, rTarget, rRoll)
+				end
+				local bStatus, sError = pcall(fObserver, rSource, rTarget, rRoll)
+				if not bStatus and Debug and Debug.console then
+					Debug.console("StealthTracker observer error (fallback): " .. tostring(sError))
+				end
+			end
+			aOwnWrappers[fWrapper] = true
+			ActionsManager.registerResultHandler(sType, fWrapper)
+		end
+	end
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
 	if ActionGeneral then
@@ -250,11 +302,90 @@ function checkAllowOutOfTurn()
 		   checkAllowOutOfCombat()
 end
 
+function getActiveDuplicateCTNodePath(sCTNode)
+	local nodeCT = ActorManager.getCTNode(sCTNode)
+	local nodeActiveCT = CombatManager.getActiveCT()
+	if nodeCT and nodeActiveCT and nodeCT.getPath() ~= nodeActiveCT.getPath() then
+		local nodeCreature = ActorManager.getCreatureNode(nodeCT)
+		local nodeActiveCreature = ActorManager.getCreatureNode(nodeActiveCT)
+		if nodeCreature and nodeActiveCreature and nodeCreature.getPath() == nodeActiveCreature.getPath() then
+			return nodeActiveCT.getPath()
+		end
+	end
+	return sCTNode
+end
+
+function resolveTargetDuplicateCTNode(rSource, rTarget)
+	if not rTarget or not rSource then return rTarget end
+	
+	local nodeTargetCT = ActorManager.getCTNode(rTarget)
+	if not nodeTargetCT then return rTarget end
+	
+	local sTargetName = ActorManager.getDisplayName(rTarget)
+	if sTargetName == "" then return rTarget end
+	
+	-- 1. Check if the attacker has a target selected with the same name
+	if TargetingManager and TargetingManager.getFullTargets then
+		local aTargets = TargetingManager.getFullTargets(rSource)
+		for _, rT in ipairs(aTargets or {}) do
+			local nodeTCT = ActorManager.getCTNode(rT)
+			if nodeTCT and nodeTCT.getPath() ~= nodeTargetCT.getPath() then
+				local sTName = ActorManager.getDisplayName(rT)
+				if sTName == sTargetName then
+					if Debug and Debug.console then
+						Debug.console("StealthTracker: Redirecting target to attacker's explicit target by name:", nodeTCT.getPath())
+					end
+					return rT
+				end
+			end
+		end
+	end
+	
+	-- 2. Fallback for drops: Find if any CT entry with the same name has a Stealth effect
+	local nodeHighestStealthCT = nil
+	local nHighestStealth = -1
+	
+	if CombatManager and CombatManager.getSortedCombatantList then
+		local lCombatTrackerActors = CombatManager.getSortedCombatantList()
+		for _, nodeCT in ipairs(lCombatTrackerActors or {}) do
+			local sCTName = ActorManager.getDisplayName(nodeCT)
+			if sCTName == sTargetName then
+				local nStealth = getStealthNumberFromEffects(nodeCT)
+				if nStealth and nStealth > nHighestStealth then
+					nHighestStealth = nStealth
+					nodeHighestStealthCT = nodeCT
+				end
+			end
+		end
+	end
+	
+	if nodeHighestStealthCT and nodeHighestStealthCT.getPath() ~= nodeTargetCT.getPath() then
+		local rNewTarget = ActorManager.resolveActor(nodeHighestStealthCT)
+		if rNewTarget then
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: Redirecting target to hiding duplicate by name:", nodeHighestStealthCT.getPath(), "with Stealth:", nHighestStealth)
+			end
+			return rNewTarget
+		end
+	end
+	
+	return rTarget
+end
+
 function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 	if checkAndDisplayCTInactiveAndOutsideOfCombatStealthDisallowed() then return false end
 
 	local nodeCT = ActorManager.getCTNode(vActor)
-	if CombatManager.getActiveCT() ~= nodeCT and not checkAllowOutOfTurn() then
+	local nodeActiveCT = CombatManager.getActiveCT()
+	local sNodeCTPath = nodeCT and nodeCT.getPath() or "nil"
+	local sActiveCTPath = nodeActiveCT and nodeActiveCT.getPath() or "nil"
+	local bAllowOutOfTurn = checkAllowOutOfTurn()
+
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: checkAndDisplayAllowOutOfCombatAndTurnChecks - nodeCT path:", sNodeCTPath, "activeCT path:", sActiveCTPath, "allowOutOfTurn:", bAllowOutOfTurn)
+	end
+
+	if sActiveCTPath ~= sNodeCTPath and not bAllowOutOfTurn then
 		if checkVerbosityMax() then
 			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, TURN), SECRET)
 		end
@@ -318,8 +449,15 @@ end
 function displayChatMessage(sFormattedText, bSecret)
 	if sFormattedText == nil then return end
 
-    local sMode = getMode()
-	local msg = {font = "msgfont", icon = "stealth_icon", secret = checkShowEye(), text = sFormattedText, mode = sMode}  -- secret true shows the cross eye icon, wasting space
+	-- Framed chat modes render via a FormattedText control that parses the text as XML - escape
+	-- any raw "<" so message text can never break it ("&lt;" renders as "<").
+	local sSafeText = sFormattedText:gsub("<", "&lt;")
+	local msg = {font = "msgfont", icon = "stealth_icon", secret = checkShowEye(), text = sSafeText}
+	-- Per the Comm refdoc, mode should be "set only if you want to specify a chat mode".
+	local sMode = getMode()
+	if sMode ~= "" then
+		msg.mode = sMode
+	end
 	-- deliverChatMessage() is a broadcast mechanism, addChatMessage() is local only.
 	if bSecret then
 		Comm.addChatMessage(msg)
@@ -341,6 +479,11 @@ end
 function displayProcessAttackFromStealth(rSource, rTarget)
 	-- if no source or no roll then exit, skipping StealthTracker processing.
 	if not rSource or rSource.sCTNode == nil or rSource.sCTNode == "" then return end
+
+	-- Redirect rTarget to correct duplicate if applicable
+	if rTarget then
+		rTarget = resolveTargetDuplicateCTNode(rSource, rTarget)
+	end
 
 	-- Extract the stealth number from the source, if available.  It's used later in this function at a couple spots.
 	local nodeSourceCT = ActorManager.getCTNode(rSource)
@@ -394,8 +537,11 @@ end
 
 -- This function executes on clients.
 function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: displayProcessStealthUpdateForSkillHandlers called. sCTNode:", rSource and rSource.sCTNode)
+	end
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
-	if rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
+	if rSource and rSource.sCTNode and rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
         -- Explicitly decode advantage/disadvantage using 5E-specific managers to ensure we don't just sum all dice.
         if ActionD20 and ActionD20.decodeAdvantage then
             ActionD20.decodeAdvantage(rRoll)
@@ -405,14 +551,27 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 
 		-- Calculate the stealth roll so that it's available to put in the creature effects.
 		local nStealthTotal = ActionsManager.total(rRoll)
+		if Debug and Debug.console then
+			Debug.console("StealthTracker: nStealthTotal calculated:", nStealthTotal, "USER_ISHOST:", USER_ISHOST)
+		end
+
+		local sTargetCTNode = getActiveDuplicateCTNodePath(rSource.sCTNode)
+		if Debug and Debug.console and sTargetCTNode ~= rSource.sCTNode then
+			Debug.console("StealthTracker: Redirecting roll target from", rSource.sCTNode, "to active duplicate:", sTargetCTNode)
+		end
+
 		-- If the source of the roll is a npc sheet shared to a player, notify the host to update the stealth value.
 		if USER_ISHOST then
 			-- The CT node and the character sheet node are different nodes.  Updating the name on the CT node only updates the CT and not their character sheet value.
-			if checkAndDisplayAllowOutOfCombatAndTurnChecks(rSource.sCTNode) then
-				setNodeWithStealthValue(rSource.sCTNode, nStealthTotal)
+			local bAllow = checkAndDisplayAllowOutOfCombatAndTurnChecks(sTargetCTNode)
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: Host checkAndDisplayAllowOutOfCombatAndTurnChecks:", bAllow)
+			end
+			if bAllow then
+				setNodeWithStealthValue(sTargetCTNode, nStealthTotal)
                 -- Display the stealth information now that the Stealth roll has been made so the DM can take advantage of the info if it all happens on the same turn (i.e. hide, then attack).
                 if OptionsManager.getOption(STEALTHTRACKER_SHOW_AFTER_STEALTH) == ON then
-                    local nodeCT = ActorManager.getCTNode(rSource.sCTNode)
+                    local nodeCT = ActorManager.getCTNode(sTargetCTNode)
                     displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, FORCE_DISPLAY)
                 end
 			end
@@ -420,7 +579,10 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
 			displayChatMessage(output, false)
 		else
-			notifyUpdateStealth(rSource.sCTNode, nStealthTotal)
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: Client sending update request via OOB message. sCTNode:", sTargetCTNode)
+			end
+			notifyUpdateStealth(sTargetCTNode, nStealthTotal)
 		end
 	end
 end
@@ -940,7 +1102,9 @@ function getStealthValueFromEffectNode(nodeEffect)
 	-- Take the last Stealth value found, in case it was manually entered and accidentally duplicated (iterate through all of the components).
 	local pattern = "^%s*" .. LOCALIZED_STEALTH_LOWER .. ":%s*(%-?%d+)%s*$"
 	for _, component in ipairs(aEffectComponents) do
-		local sMatch = string.match(component, pattern)
+		-- Strip outer parentheses if present (e.g. from GM-only display label or manual entry)
+		local sCleanComponent = component:match("^%s*%((.-)%)%s*$") or component
+		local sMatch = string.match(sCleanComponent, pattern)
 		if sMatch then
 			sExtractedStealth = sMatch
 		end
@@ -965,14 +1129,26 @@ end
 
 -- Handler for the message to update stealth that comes from a client player who is controlling a shared npc and making a stealth roll (no permission to update npc CT actor on client)
 function handleUpdateStealth(msgOOB)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: handleUpdateStealth OOB message received. sCTNodeId:", msgOOB and msgOOB.sCTNodeId, "nStealthTotal:", msgOOB and msgOOB.nStealthTotal)
+	end
 	if not msgOOB or msgOOB.nStealthTotal == nil or msgOOB.sCTNodeId == nil or not msgOOB.user then return end
 
 	-- Deserialize the number. Numbers are serialized as strings in the OOB msg.
 	local nStealthTotal = tonumber(msgOOB.nStealthTotal)
 	if nStealthTotal == nil then return end
 
-	if checkAndDisplayAllowOutOfCombatAndTurnChecks(msgOOB.sCTNodeId) then
-		setNodeWithStealthValue(msgOOB.sCTNodeId, nStealthTotal)
+	local sTargetCTNode = getActiveDuplicateCTNodePath(msgOOB.sCTNodeId)
+	if Debug and Debug.console and sTargetCTNode ~= msgOOB.sCTNodeId then
+		Debug.console("StealthTracker: OOB redirecting roll target from", msgOOB.sCTNodeId, "to active duplicate:", sTargetCTNode)
+	end
+
+	local bAllow = checkAndDisplayAllowOutOfCombatAndTurnChecks(sTargetCTNode)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: OOB checkAndDisplayAllowOutOfCombatAndTurnChecks:", bAllow)
+	end
+	if bAllow then
+		setNodeWithStealthValue(sTargetCTNode, nStealthTotal)
 	end
 end
 
@@ -1163,27 +1339,66 @@ function onInitiateSkill(rSource, rTarget, rRoll)
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
-    -- Passthrough to ruleset handler
-    if type(ActionAttack_onAttack_Ruleset) == "function" then
-	    ActionAttack_onAttack_Ruleset(rSource, rTarget, rRoll)
-    end
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: onRollAttack called. sType:", rRoll and rRoll.sType, "sDesc:", rRoll and rRoll.sDesc)
+	end
+
+	-- Redirect rSource.sCTNode to active duplicate CT node if applicable
+	if rSource and rSource.sCTNode and rSource.sCTNode ~= "" then
+		local sNewPath = getActiveDuplicateCTNodePath(rSource.sCTNode)
+		if sNewPath ~= rSource.sCTNode then
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: onRollAttack redirecting rSource.sCTNode from", rSource.sCTNode, "to", sNewPath)
+			end
+			rSource.sCTNode = sNewPath
+		end
+	end
+
+	-- If target is nil, try to resolve it from the active duplicate CT node's targets
+	if not rTarget and rSource and rSource.sCTNode ~= "" and TargetingManager and TargetingManager.getFullTargets then
+		local aTargets = TargetingManager.getFullTargets(rSource)
+		if aTargets and #aTargets > 0 then
+			rTarget = aTargets[1]
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: Resolved target from active duplicate targets:", rTarget and rTarget.sCTNode)
+			end
+		end
+	end
+
+	-- Redirect rTarget to correct duplicate if applicable
+	if rTarget then
+		rTarget = resolveTargetDuplicateCTNode(rSource, rTarget)
+	end
 
 	-- When attacks are rolled in the tower, the target is always nil.
-	if not rTarget and rRoll.bSecret then
+	if not rTarget and rRoll and rRoll.bSecret then
 		displayTowerRoll()
 	end
 
 	displayProcessAttackFromStealth(rSource, rTarget)
 end
 
--- This is the handler that we wire up to override the default roll handler.
+-- Post-resolve observer for skill-type rolls. Runs AFTER the ruleset's own result handler.
 function onRollSkill(rSource, rTarget, rRoll)
-	-- Passthrough to ruleset handler
-    if type(ActionSkill_onRoll_Ruleset) == "function" then
-	    ActionSkill_onRoll_Ruleset(rSource, rTarget, rRoll)
-    end
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: onRollSkill called. sType:", rRoll and rRoll.sType, "sDesc:", rRoll and rRoll.sDesc)
+	end
+
+	-- Redirect rSource.sCTNode to active duplicate CT node if applicable
+	if rSource and rSource.sCTNode and rSource.sCTNode ~= "" then
+		local sNewPath = getActiveDuplicateCTNodePath(rSource.sCTNode)
+		if sNewPath ~= rSource.sCTNode then
+			if Debug and Debug.console then
+				Debug.console("StealthTracker: onRollSkill redirecting rSource.sCTNode from", rSource.sCTNode, "to", sNewPath)
+			end
+			rSource.sCTNode = sNewPath
+		end
+	end
 
 	local bProcessStealth = rSource and rRoll and ActionsManager.doesRollHaveDice(rRoll) and isStealthSkillRoll(rRoll.sDesc)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: onRollSkill - bProcessStealth evaluated to:", bProcessStealth)
+	end
 	if bProcessStealth then
 	    displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
     end
@@ -1238,10 +1453,16 @@ end
 
 -- Function to encapsulate the setting of the name with stealth value.
 function setNodeWithStealthValue(sCTNode, nStealthTotal)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: setNodeWithStealthValue called. sCTNode:", sCTNode, "nStealthTotal:", nStealthTotal)
+	end
 	if sCTNode == nil or nStealthTotal == nil then return end
 
 	-- First, delete any existing Stealth effects on the CT node.
 	local nodeCT = ActorManager.getCTNode(sCTNode)
+	if Debug and Debug.console then
+		Debug.console("StealthTracker: setNodeWithStealthValue - nodeCT found:", nodeCT ~= nil)
+	end
 	if not nodeCT then return end
 
 	deleteAllStealthEffects(nodeCT)

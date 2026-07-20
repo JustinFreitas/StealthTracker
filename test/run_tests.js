@@ -140,7 +140,8 @@ async function runTests() {
         end
 
         -- Mock OptionsManager
-        function OptionsManager.getOption(key) return "off" end
+        OptionsManager_mock_options = {}
+        function OptionsManager.getOption(key) return OptionsManager_mock_options[key] or "off" end
         function OptionsManager.isOption(key, val) return false end
 
         -- Mock EffectManager hasEffect to avoid nil calls
@@ -184,7 +185,7 @@ async function runTests() {
             console.log(`  ✓ PASS: ${fnName} -> got ${result}`);
             testsPassed++;
         } catch (err) {
-            console.error(`  ✗ FAIL: ${fnName} -> expected ${expected}, got error or mismatch: ${err.message}`);
+            console.error(`  ✗ FAIL: ${fnName} -> expected ${expected}, got error or mismatch:\n`, err);
             testsFailed++;
         }
     }
@@ -248,12 +249,18 @@ async function runTests() {
     await lua.doString(`
         -- Mock EffectManager helper
         EffectManager.parseEffect = function(label) return { label } end
-
-        nodeEffectStealth = createMockNode({ label = "Stealth: 14" })
-        nodeEffectOther = createMockNode({ label = "ATK: +2" })
     `);
-    await runAssert("getStealthValueFromEffectNode('Stealth: 14')", "14", "return getStealthValueFromEffectNode(nodeEffectStealth)");
-    await runAssert("getStealthValueFromEffectNode('ATK: +2')", null, "return getStealthValueFromEffectNode(nodeEffectOther)");
+    await runAssert(
+        "getStealthValueFromEffectNode-parsing-variations",
+        true,
+        `
+            local val1 = getStealthValueFromEffectNode(createMockNode({ label = "Stealth: 14" }))
+            local val2 = getStealthValueFromEffectNode(createMockNode({ label = "(Stealth: 14)" }))
+            local val3 = getStealthValueFromEffectNode(createMockNode({ label = " (Stealth: 14) " }))
+            local val4 = getStealthValueFromEffectNode(createMockNode({ label = "ATK: +2" }))
+            return val1 == "14" and val2 == "14" and val3 == "14" and val4 == nil
+        `
+    );
 
     // --- GROUP G: Passive Perception Math (5E Ruleset) ---
     // PC Case: Read directly from "perception" field on the character sheet
@@ -337,6 +344,285 @@ async function runTests() {
     `);
     await runAssert("isValidCTNode(PC disabled)", false, "return isValidCTNode(actorPCDisabled)");
     await runAssert("isValidCTNode(NPC disabled)", false, "return isValidCTNode(actorNPCDisabled)");
+
+    // --- GROUP M: Observer Architecture & XML Escaping (v1.0.5 Backport) ---
+    await lua.doString(`
+        -- Define additional mocks required for onInit and observer testing
+        function Interface.getString(s)
+            if s == "skill_value_stealth" then return "Stealth" end
+            if s == "dexterity" then return "Dexterity" end
+            return s or ""
+        end
+        function User.isHost() return true end
+        function OptionsManager.registerOption2() end
+        
+        CombatManager = {}
+        function CombatManager.setCustomCombatReset() end
+        function CombatManager.onDrop() end
+        function CombatManager.requestActivation() end
+
+        -- Backing table for ActionsManager handlers to test fallback
+        ActionsManager.aHandlers = {}
+        function ActionsManager.registerResultHandler(sType, fn)
+            ActionsManager.aHandlers[sType] = fn
+        end
+        function ActionsManager.getResultHandler(sType)
+            return ActionsManager.aHandlers[sType]
+        end
+        function ActionsManager.doesRollHaveDice(rRoll)
+            return true
+        end
+
+        -- Mock ruleset original result handlers
+        function mockRulesetOnSkillRoll() end
+        function mockRulesetOnAttackRoll() end
+        ActionsManager.registerResultHandler("skill", mockRulesetOnSkillRoll)
+        ActionsManager.registerResultHandler("attack", mockRulesetOnAttackRoll)
+
+        -- Mock CoreRPG GameManager layered hook registry
+        GameManager = {}
+        GameManager.aMultiKey = {}
+        function GameManager.setMultiKeyFunction(sKey, sSubKey, fn)
+            GameManager.aMultiKey[sKey] = GameManager.aMultiKey[sKey] or {}
+            GameManager.aMultiKey[sKey][sSubKey or ""] = fn
+        end
+        function GameManager.getMultiKeyFunction(sKey, sSubKey)
+            return GameManager.aMultiKey[sKey] and GameManager.aMultiKey[sKey][sSubKey or ""]
+        end
+
+        -- Mock pre-existing GameManager post-resolve hook to verify chaining
+        prevPostResolveCalls = 0
+        GameManager.setMultiKeyFunction("onActionPostResolve", "attack", function()
+            prevPostResolveCalls = prevPostResolveCalls + 1
+        end)
+
+        -- Execute onInit to install observers/wrappers
+        onInit()
+    `);
+
+    await runAssert(
+        "observers-installed-via-GameManager",
+        true,
+        `
+            return type(GameManager.getMultiKeyFunction("onActionPostResolve", "skill")) == "function"
+               and type(GameManager.getMultiKeyFunction("onActionPostResolve", "attack")) == "function"
+        `
+    );
+
+    await runAssert(
+        "ruleset-handlers-untouched",
+        true,
+        `
+            return ActionsManager.aHandlers["skill"] == mockRulesetOnSkillRoll
+               and ActionsManager.aHandlers["attack"] == mockRulesetOnAttackRoll
+        `
+    );
+
+    await runAssert(
+        "double-init-is-noop (idempotent init guard)",
+        true,
+        `
+            local fBefore = GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+            onInit()
+            return fBefore == GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+        `
+    );
+
+    await runAssert(
+        "onRollAttack observer routing",
+        1,
+        `
+            local nAttackObserved = 0
+            local fRealDisplay = displayProcessAttackFromStealth
+            displayProcessAttackFromStealth = function() nAttackObserved = nAttackObserved + 1 end
+
+            local fAttackSlot = GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+            local rSource = createMockNode({ recordType = "pc" })
+            fAttackSlot(rSource, nil, { sType = "attack" })
+
+            displayProcessAttackFromStealth = fRealDisplay
+            return nAttackObserved
+        `
+    );
+
+    await runAssert(
+        "onRollSkill observer routing",
+        1,
+        `
+            local nSkillObserved = 0
+            local fRealDisplay = displayProcessStealthUpdateForSkillHandlers
+            displayProcessStealthUpdateForSkillHandlers = function() nSkillObserved = nSkillObserved + 1 end
+
+            local fSkillSlot = GameManager.getMultiKeyFunction("onActionPostResolve", "skill")
+            local rSource = createMockNode({ recordType = "pc" })
+            fSkillSlot(rSource, nil, { sType = "skill", sDesc = "[skill] stealth" })
+
+            displayProcessStealthUpdateForSkillHandlers = fRealDisplay
+            return nSkillObserved
+        `
+    );
+
+    await lua.doString(`
+        -- Test displayChatMessage XML escaping and mode cleanup
+        lastChatMessage = nil
+        Comm.addChatMessage = function(msg) lastChatMessage = msg end
+    `);
+
+    await runAssert(
+        "chat-escapes-lt",
+        "a &lt; b",
+        `
+            OptionsManager_mock_options["STEALTHTRACKER_FRAME_STYLE"] = "none"
+            displayChatMessage("a < b", true)
+            return lastChatMessage and lastChatMessage.text
+        `
+    );
+
+    await runAssert(
+        "chat-omits-empty-mode",
+        null,
+        `
+            return lastChatMessage and lastChatMessage.mode
+        `
+    );
+
+    await runAssert(
+        "chat-sets-chosen-mode",
+        "story",
+        `
+            OptionsManager_mock_options["STEALTHTRACKER_FRAME_STYLE"] = "story"
+            displayChatMessage("hello", true)
+            return lastChatMessage and lastChatMessage.mode
+        `
+    );
+
+    await runAssert(
+        "duplicate-actor-redirection-and-targeting",
+        true,
+        `
+            ActorManager.node1 = {
+                getPath = function() return "combattracker.list.id-00001" end
+            }
+            ActorManager.node3 = {
+                getPath = function() return "combattracker.list.id-00003" end
+            }
+            ActorManager.node4 = {
+                getPath = function() return "combattracker.list.id-00004" end
+            }
+            ActorManager.creatureNode = {
+                getPath = function() return "charsheet.id-00001" end
+            }
+            ActorManager.rTargetMock = {
+                sCTNode = "combattracker.list.id-00005"
+            }
+            
+            local fRealGetCTNode = ActorManager.getCTNode
+            local fRealGetActiveCT = CombatManager.getActiveCT
+            local fRealGetCreatureNode = ActorManager.getCreatureNode
+            local fRealGetFullTargets = TargetingManager and TargetingManager.getFullTargets
+            local fRealDisplay = displayProcessAttackFromStealth
+            local fRealGetDisplayName = ActorManager.getDisplayName
+            local fRealGetSortedCombatantList = CombatManager.getSortedCombatantList
+            local fRealGetStealthNumberFromEffects = getStealthNumberFromEffects
+            local fRealResolveActor = ActorManager.resolveActor
+
+            function ActorManager.getCTNode(s)
+                if s == "combattracker.list.id-00001" then return ActorManager.node1 end
+                if s == "combattracker.list.id-00004" then return ActorManager.node4 end
+                if s == "combattracker.list.id-00003" then return ActorManager.node3 end
+                if type(s) == "table" then
+                    if s.sCTNode == "combattracker.list.id-00001" or s == ActorManager.node1 then return ActorManager.node1 end
+                    if s.sCTNode == "combattracker.list.id-00003" or s == ActorManager.node3 then return ActorManager.node3 end
+                    if s.sCTNode == "combattracker.list.id-00004" or s == ActorManager.node4 then return ActorManager.node4 end
+                end
+                return nil
+            end
+            function CombatManager.getActiveCT()
+                return ActorManager.node4
+            end
+            function ActorManager.getCreatureNode(node)
+                if node == ActorManager.node1 or node == ActorManager.node4 then
+                    return ActorManager.creatureNode
+                end
+                return nil
+            end
+            function ActorManager.getDisplayName(r)
+                if r == ActorManager.node3 or (type(r) == "table" and r.sCTNode == "combattracker.list.id-00003") then return "Durin Stonefist" end
+                if r == ActorManager.node4 or (type(r) == "table" and r.sCTNode == "combattracker.list.id-00004") then return "Durin Stonefist" end
+                return ""
+            end
+            
+            TargetingManager = TargetingManager or {}
+            function TargetingManager.getFullTargets(rSource)
+                if rSource.sCTNode == "combattracker.list.id-00004" then
+                    return { ActorManager.rTargetMock }
+                end
+                if rSource.sCTNode == "combattracker.list.id-00002" then
+                    return { ActorManager.node4 }
+                end
+                return {}
+            end
+
+            -- Scenario 1: Verify getActiveDuplicateCTNodePath redirection
+            local path1 = getActiveDuplicateCTNodePath("combattracker.list.id-00001")
+            local bPass1 = (path1 == "combattracker.list.id-00004")
+
+            -- Scenario 2: Verify target resolution on duplicate turn attack
+            ActorManager.resolvedTargetNode = nil
+            displayProcessAttackFromStealth = function(source, target)
+                ActorManager.resolvedTargetNode = target and target.sCTNode
+            end
+
+            local rSource = { sCTNode = "combattracker.list.id-00001" }
+            onRollAttack(rSource, nil, { sType = "attack" })
+            local bPass2 = (ActorManager.resolvedTargetNode == "combattracker.list.id-00005")
+
+            -- Scenario 3: Verify resolveTargetDuplicateCTNode name-based redirection (targeted)
+            local rGoblin = { sCTNode = "combattracker.list.id-00002" }
+            local rDurin1 = { sCTNode = "combattracker.list.id-00003" }
+            local rResolved = resolveTargetDuplicateCTNode(rGoblin, rDurin1)
+            local bPass3 = (rResolved and rResolved.getPath and rResolved.getPath() == "combattracker.list.id-00004")
+
+            -- Scenario 4: Verify resolveTargetDuplicateCTNode fallback for drops (no selected targets)
+            function TargetingManager.getFullTargets(rSource)
+                return {}
+            end
+            function CombatManager.getSortedCombatantList()
+                return { ActorManager.node3, ActorManager.node4 }
+            end
+            function getStealthNumberFromEffects(node)
+                if node == ActorManager.node3 then return 7 end
+                if node == ActorManager.node4 then return 18 end
+                return nil
+            end
+            function ActorManager.resolveActor(node)
+                if node == ActorManager.node3 then return { sCTNode = "combattracker.list.id-00003" } end
+                if node == ActorManager.node4 then return { sCTNode = "combattracker.list.id-00004" } end
+                return nil
+            end
+
+            local rGoblinNoTarget = { sCTNode = "combattracker.list.id-00002" }
+            local rResolvedDrop = resolveTargetDuplicateCTNode(rGoblinNoTarget, rDurin1)
+            local bPass4 = (rResolvedDrop and rResolvedDrop.sCTNode == "combattracker.list.id-00004")
+
+            -- Restore mocked globals
+            ActorManager.getCTNode = fRealGetCTNode
+            CombatManager.getActiveCT = fRealGetActiveCT
+            ActorManager.getCreatureNode = fRealGetCreatureNode
+            ActorManager.getDisplayName = fRealGetDisplayName
+            CombatManager.getSortedCombatantList = fRealGetSortedCombatantList
+            getStealthNumberFromEffects = fRealGetStealthNumberFromEffects
+            ActorManager.resolveActor = fRealResolveActor
+            displayProcessAttackFromStealth = fRealDisplay
+            if fRealGetFullTargets then
+                TargetingManager.getFullTargets = fRealGetFullTargets
+            else
+                TargetingManager.getFullTargets = nil
+            end
+
+            return bPass1 and bPass2 and bPass3 and bPass4
+        `
+    );
 
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);
