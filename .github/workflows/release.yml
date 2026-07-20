@@ -51,7 +51,7 @@ jobs:
       - name: Create Extension Package
         run: |
           mkdir -p out
-          zip -r out/StealthTracker.ext extension.xml readme.txt graphics scripts
+          zip -r out/StealthTracker.ext extension.xml graphics scripts
           echo "Extension successfully packaged."
 
       - name: Generate Release Notes
