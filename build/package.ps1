@@ -19,7 +19,6 @@ $zip = [System.IO.Compression.ZipFile]::Open($zipPath, [System.IO.Compression.Zi
 $filesToInclude = @(
     "extension.xml",
     "scripts\stealthtracker.lua",
-    "graphics\StealthTrackerScreenshot.png",
     "graphics\icons\stealth_icon.png"
 )
 
