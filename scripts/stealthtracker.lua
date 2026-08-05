@@ -329,9 +329,9 @@ function resolveTargetDuplicateCTNode(rSource, rTarget)
 		local aTargets = TargetingManager.getFullTargets(rSource)
 		for _, rT in ipairs(aTargets or {}) do
 			local nodeTCT = ActorManager.getCTNode(rT)
-			if nodeTCT and nodeTCT.getPath() ~= nodeTargetCT.getPath() then
+			if nodeTCT then
 				local sTName = ActorManager.getDisplayName(rT)
-				if sTName == sTargetName then
+				if StringManager.trim(sTName) == StringManager.trim(sTargetName) then
 					if Debug and Debug.console then
 						Debug.console("StealthTracker: Redirecting target to attacker's explicit target by name:", nodeTCT.getPath())
 					end
@@ -575,9 +575,6 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
                     displayStealthCheckInformationWithConditionAndVerboseChecks(nodeCT, FORCE_DISPLAY)
                 end
 			end
-		elseif isPlayerStealthInfoDisabled() and not checkVerbosityOff() then -- TODO: This condition is a candidate for earlier trapping in an onRoll() overrided.  Then we could encode it to the tower and issue the roll.
-			local output = string.format("The DM has StealthTracker info set to hidden.  Use the dice tower to make your %s roll.", LOCALIZED_STEALTH)
-			displayChatMessage(output, false)
 		else
 			if Debug and Debug.console then
 				Debug.console("StealthTracker: Client sending update request via OOB message. sCTNode:", sTargetCTNode)
@@ -943,37 +940,38 @@ function getPassivePerceptionNumber(vActor)
 		nPP = getDefaultPassivePerception(nodeCreature)
 	end
 
-    return modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
+	local rActor = getActorSafe(vActor)
+    return modifyPassivePerceptionForActorEffects(rActor, nPP)
 end
 
-function getAdvDisadvForPerception(nodeCreature)
+function getAdvDisadvForPerception(rActor)
     local bADV, bDIS = false, false
-    if hasEffectSafe(nodeCreature, "ADVSKILL") then
+    if hasEffectSafe(rActor, "ADVSKILL") then
         bADV = true
-    elseif #(getEffectsByTypeSafe(nodeCreature, "ADVSKILL", A_SKILL_FILTER)) > 0 then
+    elseif #(getEffectsByTypeSafe(rActor, "ADVSKILL", A_SKILL_FILTER)) > 0 then
         bADV = true
-    elseif hasEffectSafe(nodeCreature, "ADVCHK") then
+    elseif hasEffectSafe(rActor, "ADVCHK") then
         bADV = true
-    elseif #(getEffectsByTypeSafe(nodeCreature, "ADVCHK", A_CHECK_FILTER)) > 0 then
+    elseif #(getEffectsByTypeSafe(rActor, "ADVCHK", A_CHECK_FILTER)) > 0 then
         bADV = true
     end
-    if hasEffectSafe(nodeCreature, "DISSKILL") then
+    if hasEffectSafe(rActor, "DISSKILL") then
         bDIS = true
-    elseif #(getEffectsByTypeSafe(nodeCreature, "DISSKILL", A_SKILL_FILTER)) > 0 then
+    elseif #(getEffectsByTypeSafe(rActor, "DISSKILL", A_SKILL_FILTER)) > 0 then
         bDIS = true
-    elseif hasEffectSafe(nodeCreature, "DISCHK") then
+    elseif hasEffectSafe(rActor, "DISCHK") then
         bDIS = true
-    elseif #(getEffectsByTypeSafe(nodeCreature, "DISCHK", A_CHECK_FILTER)) > 0 then
+    elseif #(getEffectsByTypeSafe(rActor, "DISCHK", A_CHECK_FILTER)) > 0 then
         bDIS = true
     end
 
-    -- if EffectManager5E.hasEffectCondition(nodeCreature, "Frightened") then
+    -- if EffectManager5E.hasEffectCondition(rActor, "Frightened") then
     --     bDIS = true
     -- end
 
     -- Get ability modifiers
-    local aAddDice, nAddMod, _ = getEffectsBonusSafe(nodeCreature, {"CHECK"}, false, A_CHECK_FILTER)
-    local aSkillAddDice, nSkillAddMod, nSkillEffectCount = getEffectsBonusSafe(nodeCreature, {"SKILL"}, false, A_SKILL_FILTER)
+    local aAddDice, nAddMod, _ = getEffectsBonusSafe(rActor, {"CHECK"}, false, A_CHECK_FILTER)
+    local aSkillAddDice, nSkillAddMod, nSkillEffectCount = getEffectsBonusSafe(rActor, {"SKILL"}, false, A_SKILL_FILTER)
     if (nSkillEffectCount > 0) then
         for _,v in ipairs(aSkillAddDice) do
             table.insert(aAddDice, v)
@@ -982,7 +980,7 @@ function getAdvDisadvForPerception(nodeCreature)
     end
 
     -- Get ability modifiers
-    local nBonusStat, nBonusEffects = getAbilityEffectsBonusSafe(nodeCreature, "wisdom")
+    local nBonusStat, nBonusEffects = getAbilityEffectsBonusSafe(rActor, "wisdom")
     if nBonusEffects > 0 then
         nAddMod = nAddMod + nBonusStat
     end
@@ -1102,8 +1100,15 @@ function getStealthValueFromEffectNode(nodeEffect)
 	-- Take the last Stealth value found, in case it was manually entered and accidentally duplicated (iterate through all of the components).
 	local pattern = "^%s*" .. LOCALIZED_STEALTH_LOWER .. ":%s*(%-?%d+)%s*$"
 	for _, component in ipairs(aEffectComponents) do
-		-- Strip outer parentheses if present (e.g. from GM-only display label or manual entry)
-		local sCleanComponent = component:match("^%s*%((.-)%)%s*$") or component
+		-- First, strip leading/trailing whitespace
+		local sCleanComponent = component:match("^%s*(.-)%s*$") or component
+		-- Then strip outer parentheses if present (e.g. from GM-only display label or manual entry)
+		sCleanComponent = sCleanComponent:match("^%((.-)%)$") or sCleanComponent
+		-- Also strip an unmatched leading parenthesis if FGU split a GM-only effect with semicolons
+		sCleanComponent = sCleanComponent:match("^%((.*)$") or sCleanComponent
+		-- Also strip an unmatched trailing parenthesis
+		sCleanComponent = sCleanComponent:match("^(.-)%)$") or sCleanComponent
+
 		local sMatch = string.match(sCleanComponent, pattern)
 		if sMatch then
 			sExtractedStealth = sMatch
@@ -1241,8 +1246,8 @@ function isValidCTNode(nodeCT)
             and not isStealthTrackerDisabledForActor(nodeCT)
 end
 
-function modifyPassivePerceptionForActorEffects(nodeCreature, nPP)
-    local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(nodeCreature)
+function modifyPassivePerceptionForActorEffects(rActor, nPP)
+    local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(rActor)
     local nAdvBonus = bAdv and 5 or 0
     local nDisadvPenalty = bDisadv and -5 or 0
     return nPP + nAdvBonus + nDisadvPenalty + nAddMod
@@ -1487,7 +1492,21 @@ function setNodeWithStealthValue(sCTNode, nStealthTotal)
 		nGMOnly = nEffectGMOnly
 	}
 
-	EffectManager.addEffect("", "", nodeCT, rEffect, true)
+	-- Only show the chat announcement message if visibility is set to 'all' (Chat and Effects) and it is not a GM-only effect.
+	local sVisibility = OptionsManager.getOption(STEALTHTRACKER_VISIBILITY)
+	local bShowMsg = (sVisibility == ALL) and (nEffectGMOnly == 0)
+
+	EffectManager.addEffect("", "", nodeCT, rEffect, bShowMsg)
+
+	-- Explicitly set isgmonly on the newly created effect node if it is GM-only to ensure it is hidden from player CT
+	if nEffectGMOnly == 1 then
+		for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
+			if DB.getValue(nodeEffect, "label", "") == sEffectName then
+				DB.setValue(nodeEffect, "isgmonly", "number", 1)
+				break
+			end
+		end
+	end
 end
 
 function validateTableOrNew(aTable)

@@ -31,6 +31,11 @@ async function runTests() {
             return s == nil or s == "" or s:gsub("%s+", "") == ""
         end
 
+        function StringManager.trim(s)
+            if not s then return "" end
+            return (s:gsub("^%s*(.-)%s*$", "%1"))
+        end
+
         -- Helper to create a mock databasenode
         function createMockNode(data)
             local node = {}
@@ -137,6 +142,39 @@ async function runTests() {
         
         function DB.getText(node, path, default)
             return DB.getValue(node, path, default) or ""
+        end
+
+        function DB.getChildren(node, path)
+            if type(node) == "table" and type(node.getChild) == "function" then
+                local childNode = node.getChild(path)
+                if childNode and type(childNode.getChildren) == "function" then
+                    return childNode.getChildren()
+                end
+            end
+            if type(node) == "table" and path and node[path] then
+                if type(node[path]) == "table" then
+                    local res = {}
+                    for k, v in pairs(node[path]) do
+                        if type(v) == "table" and type(v.getChild) == "function" then
+                            res[k] = v
+                        else
+                            res[k] = createMockNode(type(v) == "table" and v or { val = v })
+                        end
+                    end
+                    return res
+                end
+            end
+            return {}
+        end
+
+        function DB.setValue(node, path, typeStr, val)
+            if type(node) == "table" and type(node.getChild) == "function" then
+                if node.data then
+                    node.data[path] = val
+                end
+            elseif type(node) == "table" then
+                node[path] = val
+            end
         end
 
         -- Mock OptionsManager
@@ -623,6 +661,75 @@ async function runTests() {
             return bPass1 and bPass2 and bPass3 and bPass4
         `
     );
+
+    await runAssert("stealth-effect-visibility-options-none-effects-all", true, `
+        local lastAddEffectParams = nil
+        local mockEffectNode = nil
+
+        local fRealAddEffect = EffectManager.addEffect
+        EffectManager.addEffect = function(sUser, sIdentity, nodeCT, rEffect, bShowMsg)
+            lastAddEffectParams = {
+                sUser = sUser,
+                sIdentity = sIdentity,
+                nodeCT = nodeCT,
+                rEffect = rEffect,
+                bShowMsg = bShowMsg
+            }
+            -- Create mock effect node in DB
+            local nodeEffects = nodeCT.getChild("effects")
+            if not nodeEffects then
+                nodeEffects = createMockNode({})
+                nodeCT.data["effects"] = nodeEffects.data
+            end
+            local nodeNewEffect = createMockNode({
+                label = rEffect.sName,
+                isgmonly = rEffect.nGMOnly or 0
+            })
+            nodeEffects.data["eff1"] = nodeNewEffect.data
+            mockEffectNode = nodeNewEffect
+        end
+
+        local mockCTNode = createMockNode({
+            recordType = "pc",
+            faction = "friend",
+            initresult = 10,
+            effects = {}
+        })
+
+        local fRealGetCTNode = ActorManager.getCTNode
+        ActorManager.getCTNode = function(sNode) return mockCTNode end
+
+        -- Test 1: Visibility = NONE ("none")
+        OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "none"
+        mockCTNode.data["effects"] = {}
+        setNodeWithStealthValue("combattracker.list.id-00001", 15)
+
+        local bTestNoneMsg = (lastAddEffectParams.bShowMsg == false)
+        local bTestNoneGMOnly = (lastAddEffectParams.rEffect.nGMOnly == 1)
+        local bTestNoneDBGMOnly = (mockCTNode.data.effects.eff1.isgmonly == 1)
+
+        -- Test 2: Visibility = EFFECTS ("effects")
+        OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "effects"
+        mockCTNode.data["effects"] = {}
+        setNodeWithStealthValue("combattracker.list.id-00001", 15)
+
+        local bTestEffectsMsg = (lastAddEffectParams.bShowMsg == false)
+        local bTestEffectsGMOnly = (lastAddEffectParams.rEffect.nGMOnly == 0)
+
+        -- Test 3: Visibility = ALL ("all")
+        OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "all"
+        mockCTNode.data["effects"] = {}
+        setNodeWithStealthValue("combattracker.list.id-00001", 15)
+
+        local bTestAllMsg = (lastAddEffectParams.bShowMsg == true)
+        local bTestAllGMOnly = (lastAddEffectParams.rEffect.nGMOnly == 0)
+
+        -- Restore
+        EffectManager.addEffect = fRealAddEffect
+        ActorManager.getCTNode = fRealGetCTNode
+
+        return bTestNoneMsg and bTestNoneGMOnly and bTestNoneDBGMOnly and bTestEffectsMsg and bTestEffectsGMOnly and bTestAllMsg and bTestAllGMOnly
+    `);
 
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);
