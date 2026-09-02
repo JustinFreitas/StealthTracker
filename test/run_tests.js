@@ -20,11 +20,22 @@ async function runTests() {
         Interface = {}
         User = {}
         ActionsManager = {}
+        ActionD20 = {}
         EffectManager = {}
         EffectManager5E = {}
         OOBManager = {}
         StringManager = {}
         Debug = { console = function() end }
+
+        function ActionsManager.total(rRoll)
+            local nSum = (rRoll and rRoll.nMod) or 0
+            if rRoll and rRoll.aDice then
+                for _, d in ipairs(rRoll.aDice) do
+                    nSum = nSum + (d.result or 0)
+                end
+            end
+            return nSum
+        end
 
         -- Mock StringManager
         function StringManager.isBlank(s)
@@ -216,9 +227,9 @@ async function runTests() {
     let testsPassed = 0;
     let testsFailed = 0;
 
-    async function runAssert(fnName, expected, luaCodeToRun) {
+    function runAssert(fnName, expected, luaCodeToRun) {
         try {
-            const result = await lua.doString(luaCodeToRun);
+            const result = lua.doStringSync(luaCodeToRun);
             assert.strictEqual(result, expected);
             console.log(`  ✓ PASS: ${fnName} -> got ${result}`);
             testsPassed++;
@@ -398,6 +409,9 @@ async function runTests() {
         function CombatManager.setCustomCombatReset() end
         function CombatManager.onDrop() end
         function CombatManager.requestActivation() end
+        function CombatManager.getActiveCT() return nil end
+        function CombatManager.getSortedCombatantList() return {} end
+        function CombatManager.isCTHidden() return false end
 
         -- Backing table for ActionsManager handlers to test fallback
         ActionsManager.aHandlers = {}
@@ -730,6 +744,142 @@ async function runTests() {
 
         return bTestNoneMsg and bTestNoneGMOnly and bTestNoneDBGMOnly and bTestEffectsMsg and bTestEffectsGMOnly and bTestAllMsg and bTestAllGMOnly
     `);
+
+    // --- GROUP N: Generic Actions (Hide) and Advantage Decoding Idempotency ---
+    runAssert(
+        "generic-actions-hide-already-decoded-no-double-decode",
+        true,
+        `
+            local nDecodeCalls = 0
+            ActionD20 = ActionD20 or {}
+            ActionD20.decodeAdvantage = function(rRoll)
+                nDecodeCalls = nDecodeCalls + 1
+                if rRoll and rRoll.sDesc then
+                    rRoll.sDesc = rRoll.sDesc:gsub("%[ADV%]", "[ADV] [DROPPED 2]")
+                end
+            end
+
+            local rRollGA = {
+                sType = "genactroll",
+                sGenericAction = "Hide",
+                sDesc = "[EFFECTS +3] [ADV] [DROPPED 2] Stealth(6) - ask DM if successful",
+                aDice = { { type = "d20", result = 6 } },
+                nMod = 3
+            }
+            local mockSource = { sCTNode = "combattracker.list.id-00001" }
+
+            -- Simulate Generic Actions post-roll invocation
+            onGenericActionPostRoll(mockSource, rRollGA)
+
+            -- ActionD20.decodeAdvantage must NOT have been called because GA already decoded it
+            local bCallsZero = (nDecodeCalls == 0)
+            -- Description must NOT have duplicate [ADV] [DROPPED 2]
+            local bDescUntouched = (rRollGA.sDesc == "[EFFECTS +3] [ADV] [DROPPED 2] Stealth(6) - ask DM if successful")
+
+            return bCallsZero and bDescUntouched
+        `
+    );
+
+    await runAssert(
+        "ruleset-skill-already-decoded-no-double-decode",
+        true,
+        `
+            local nDecodeCalls = 0
+            ActionD20 = ActionD20 or {}
+            ActionD20.decodeAdvantage = function(rRoll)
+                nDecodeCalls = nDecodeCalls + 1
+                if rRoll and rRoll.sDesc then
+                    rRoll.sDesc = rRoll.sDesc:gsub("%[ADV%]", "[ADV] [DROPPED 2]")
+                end
+            end
+
+            local rRollSkill = {
+                sType = "skill",
+                sDesc = "[SKILL] Stealth [ADV] [DROPPED 3]",
+                aDice = { { type = "d20", result = 15 } },
+                nMod = 5
+            }
+            local mockSource = { sCTNode = "combattracker.list.id-00001" }
+
+            onRollSkill(mockSource, nil, rRollSkill)
+
+            local bCallsZero = (nDecodeCalls == 0)
+            local bDescUntouched = (rRollSkill.sDesc == "[SKILL] Stealth [ADV] [DROPPED 3]")
+
+            return bCallsZero and bDescUntouched
+        `
+    );
+
+    await runAssert(
+        "undecoded-roll-with-adv-is-decoded-once",
+        true,
+        `
+            local nDecodeCalls = 0
+            ActionD20 = ActionD20 or {}
+            ActionD20.decodeAdvantage = function(rRoll)
+                nDecodeCalls = nDecodeCalls + 1
+                if rRoll and rRoll.sDesc then
+                    rRoll.sDesc = rRoll.sDesc:gsub("%[ADV%]", "[ADV] [DROPPED 2]")
+                end
+            end
+
+            local rRollRaw = {
+                sType = "skill",
+                sDesc = "[SKILL] Stealth [ADV]",
+                aDice = { { type = "d20", result = 15 }, { type = "d20", result = 2 } },
+                nMod = 5
+            }
+            local mockSource = { sCTNode = "combattracker.list.id-00001" }
+
+            onRollSkill(mockSource, nil, rRollRaw)
+
+            -- Must be decoded exactly once
+            local bCallsOne = (nDecodeCalls == 1)
+            local bDescModified = (rRollRaw.sDesc == "[SKILL] Stealth [ADV] [DROPPED 2]")
+
+            -- Second invocation on same roll must be a no-op (idempotent)
+            onRollSkill(mockSource, nil, rRollRaw)
+            local bCallsStillOne = (nDecodeCalls == 1)
+            local bDescStillSingle = (rRollRaw.sDesc == "[SKILL] Stealth [ADV] [DROPPED 2]")
+
+            return bCallsOne and bDescModified and bCallsStillOne and bDescStillSingle
+        `
+    );
+
+    await runAssert(
+        "generic-actions-hide-case-insensitivity",
+        true,
+        `
+            local lastStealthRecorded = nil
+            local fRealSetNode = setNodeWithStealthValue
+            setNodeWithStealthValue = function(sNode, nTotal)
+                lastStealthRecorded = nTotal
+            end
+
+            local rRollGA_lower = {
+                sType = "genactroll",
+                sGenericAction = "hide",
+                sDesc = "[EFFECTS +2] Stealth(14)",
+                aDice = { { type = "d20", result = 14 } },
+                nMod = 2
+            }
+            local mockSource = { sCTNode = "combattracker.list.id-00001" }
+
+            -- Enable allow out of combat so setNodeWithStealthValue is reached
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "all"
+            local fRealIsOption = OptionsManager.isOption
+            OptionsManager.isOption = function(k, v)
+                if k == "STEALTHTRACKER_ALLOW_OUT_OF" and v == "all" then return true end
+                return false
+            end
+
+            onGenericActionPostRoll(mockSource, rRollGA_lower)
+
+            setNodeWithStealthValue = fRealSetNode
+            OptionsManager.isOption = fRealIsOption
+            return lastStealthRecorded == 16
+        `
+    );
 
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);

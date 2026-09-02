@@ -153,6 +153,20 @@ local function getResultHandlerSafe(sType)
     return nil
 end
 
+-- Helper to check if advantage/disadvantage has already been decoded on a roll (e.g. by Generic Actions or ruleset).
+local function isRollAdvantageDecoded(rRoll)
+	if not rRoll then return true end
+	if rRoll.bAdvantageDecoded then return true end
+	if rRoll.sGenericAction ~= nil then return true end
+	local sType = (rRoll.sType or ""):lower()
+	if sType == GENACTROLL then return true end
+	local sDesc = rRoll.sDesc or ""
+	if sDesc:lower():match("%[dropped") then
+		return true
+	end
+	return false
+end
+
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	-- Guard against onInit() running more than once in the same session (e.g. a script/extension
@@ -305,10 +319,10 @@ end
 function getActiveDuplicateCTNodePath(sCTNode)
 	local nodeCT = ActorManager.getCTNode(sCTNode)
 	local nodeActiveCT = CombatManager.getActiveCT()
-	if nodeCT and nodeActiveCT and nodeCT.getPath() ~= nodeActiveCT.getPath() then
+	if nodeCT and nodeActiveCT and type(nodeCT) == "table" and type(nodeActiveCT) == "table" and nodeCT.getPath and nodeActiveCT.getPath and nodeCT.getPath() ~= nodeActiveCT.getPath() then
 		local nodeCreature = ActorManager.getCreatureNode(nodeCT)
 		local nodeActiveCreature = ActorManager.getCreatureNode(nodeActiveCT)
-		if nodeCreature and nodeActiveCreature and nodeCreature.getPath() == nodeActiveCreature.getPath() then
+		if nodeCreature and nodeActiveCreature and nodeCreature.getPath and nodeActiveCreature.getPath and nodeCreature.getPath() == nodeActiveCreature.getPath() then
 			return nodeActiveCT.getPath()
 		end
 	end
@@ -377,8 +391,8 @@ function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 
 	local nodeCT = ActorManager.getCTNode(vActor)
 	local nodeActiveCT = CombatManager.getActiveCT()
-	local sNodeCTPath = nodeCT and nodeCT.getPath() or "nil"
-	local sActiveCTPath = nodeActiveCT and nodeActiveCT.getPath() or "nil"
+	local sNodeCTPath = (nodeCT and type(nodeCT) == "table" and nodeCT.getPath and nodeCT.getPath()) or (type(nodeCT) == "string" and nodeCT) or (type(vActor) == "string" and vActor) or "nil"
+	local sActiveCTPath = (nodeActiveCT and type(nodeActiveCT) == "table" and nodeActiveCT.getPath and nodeActiveCT.getPath()) or (type(nodeActiveCT) == "string" and nodeActiveCT) or "nil"
 	local bAllowOutOfTurn = checkAllowOutOfTurn()
 
 	if Debug and Debug.console then
@@ -542,11 +556,15 @@ function displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	end
 	-- To alter the creature effect, the source must be in the CT, combat must be going (there must be an active CT node), the first dice must be present in the roll, and the dice roller must either the DM or the actor who is active in the CT.
 	if rSource and rSource.sCTNode and rSource.sCTNode ~= "" and ActionsManager.doesRollHaveDice(rRoll) then
-        -- Explicitly decode advantage/disadvantage using 5E-specific managers to ensure we don't just sum all dice.
-        if ActionD20 and ActionD20.decodeAdvantage then
-            ActionD20.decodeAdvantage(rRoll)
-        elseif ActionsManager2 and ActionsManager2.decodeAdvantage then
-            ActionsManager2.decodeAdvantage(rRoll)
+        -- Explicitly decode advantage/disadvantage using 5E-specific managers if not already decoded (e.g. by Generic Actions or ruleset).
+        if not isRollAdvantageDecoded(rRoll) then
+            if ActionD20 and ActionD20.decodeAdvantage then
+                ActionD20.decodeAdvantage(rRoll)
+                rRoll.bAdvantageDecoded = true
+            elseif ActionsManager2 and ActionsManager2.decodeAdvantage then
+                ActionsManager2.decodeAdvantage(rRoll)
+                rRoll.bAdvantageDecoded = true
+            end
         end
 
 		-- Calculate the stealth roll so that it's available to put in the creature effects.
@@ -1322,7 +1340,7 @@ end
 
 -- Check for StealthTracker processing on a GenericAction (extension) Hide roll.
 function onGenericActionPostRoll(rSource, rRoll)
-	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == GENACTROLL and rRoll.sGenericAction == "Hide" then
+	if rRoll and ActionsManager.doesRollHaveDice(rRoll) and rRoll.sType == GENACTROLL and (rRoll.sGenericAction == "Hide" or (rRoll.sGenericAction and rRoll.sGenericAction:lower() == "hide")) then
 		displayProcessStealthUpdateForSkillHandlers(rSource, rRoll)
 	end
 end

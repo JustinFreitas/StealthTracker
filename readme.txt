@@ -3,7 +3,7 @@ StealthTracker
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v5.6 by Justin Freitas
+StealthTracker v5.7 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -77,3 +77,4 @@ Changelist:
 - v5.4 - FGC compatibility fix: onInit no longer crashes on Fantasy Grounds Classic.  ActionsManager.getResultHandler() is an FGU-only method, so capturing the ruleset's existing skill/attack result handlers for passthrough failed with a nil value error on classic.  Added a getResultHandlerSafe() helper that uses getResultHandler() when present (FGU, unchanged) and otherwise falls back to the internal ActionsManager handler table on FGC.
 - v5.5 - FGU-only modernization: Refactored codebase to be FGU-only. Added support for duplicate actor matching (turn check redirection, name-based NPC/PC targeting, and drag-and-drop targeting fallback). Fixed parsing/expiration of GM-only parenthesized Stealth effects (e.g. '(Stealth: 55)') on NPC attacks.
 - v5.6 - Stealth effect privacy fix: Fixed issue where Stealth effects remained visible to players on Combat Tracker when 'Player: Show Stealth info' option was set to None. Explicitly set isgmonly flag on created effect database nodes for GM-only stealth effects and suppressed chat announcements when player stealth info is disabled.
+- v5.7 - Generic Actions Hide fix: Avoid redundant advantage/disadvantage decoding in StealthTracker when Generic Actions or the ruleset has already decoded the roll, preventing duplicated '[ADV] [DROPPED ...]' chat output.
