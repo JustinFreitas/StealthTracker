@@ -3,7 +3,7 @@ StealthTracker
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v5.7 by Justin Freitas
+StealthTracker v5.7.1 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -78,3 +78,4 @@ Changelist:
 - v5.5 - FGU-only modernization: Refactored codebase to be FGU-only. Added support for duplicate actor matching (turn check redirection, name-based NPC/PC targeting, and drag-and-drop targeting fallback). Fixed parsing/expiration of GM-only parenthesized Stealth effects (e.g. '(Stealth: 55)') on NPC attacks.
 - v5.6 - Stealth effect privacy fix: Fixed issue where Stealth effects remained visible to players on Combat Tracker when 'Player: Show Stealth info' option was set to None. Explicitly set isgmonly flag on created effect database nodes for GM-only stealth effects and suppressed chat announcements when player stealth info is disabled.
 - v5.7 - Generic Actions Hide fix: Avoid redundant advantage/disadvantage decoding in StealthTracker when Generic Actions or the ruleset has already decoded the roll, preventing duplicated '[ADV] [DROPPED ...]' chat output.
+- v5.7.1 - Console cleanup: Clean up verbose debug trace console statements across attack rolls, skill rolls, duplicate actor resolution, and turn checks.
