@@ -100,6 +100,12 @@ async function runTests() {
         -- Mock ActorManager APIs
         function ActorManager.getCreatureNode(v) return v end
         function ActorManager.getActor(v) return v end
+        function ActorManager.resolveActor(v)
+            if type(v) == "table" and v.getPath and not v.sCTNode then
+                v.sCTNode = v.getPath()
+            end
+            return v
+        end
         function ActorManager.isPC(v)
             if type(v) == "table" and type(v.getChild) == "function" then
                 local nodeType = v.getChild("recordType")
@@ -212,6 +218,12 @@ async function runTests() {
             return false
         end
         function EffectManager.getEffectsByType() return {} end
+        function EffectManager.expireEffect(nodeCT, nodeEffect, nExpireComp)
+            if nodeEffect and nodeEffect.delete then
+                nodeEffect.delete()
+            end
+            return true
+        end
         
         -- Mock register callbacks to avoid crashes on load
         function ActionsManager.registerResultHandler() end
@@ -422,6 +434,9 @@ async function runTests() {
         end
         function ActionsManager.doesRollHaveDice(rRoll)
             return true
+        end
+        function ActionsManager.decodeActors(draginfo)
+            return nil
         end
 
         -- Mock ruleset original result handlers
@@ -1108,6 +1123,497 @@ async function runTests() {
             })
             ensureStealthSkillExistsOnNpc(mockNPC)
             return DB.getValue(mockNPC, "skills", "")
+        `
+    );
+
+    await runAssert(
+        "checkFGC-detection",
+        true,
+        `
+            UtilityManager = { isClientFGU = function() return false end }
+            local bFGC = checkFGC()
+            UtilityManager = { isClientFGU = function() return true end }
+            local bNotFGC = not checkFGC()
+
+            -- Test fallback with Interface.getVersion semantic strings when UtilityManager/Session are nil
+            local tSavedUtility = UtilityManager
+            local tSavedSession = Session
+            UtilityManager = nil
+            Session = nil
+
+            Interface.getVersion = function() return "3.3.14" end
+            local bFGCVersion = checkFGC()
+
+            Interface.getVersion = function() return "4.5.1" end
+            local bFGUVersion = not checkFGC()
+
+            UtilityManager = tSavedUtility
+            Session = tSavedSession
+            return bFGC and bNotFGC and bFGCVersion and bFGUVersion
+        `
+    );
+
+    await runAssert(
+        "fgc-exhaustion-disadvantage",
+        true,
+        `
+            IS_FGC = true
+            local mockPC = createMockNode({ recordType = "pc", abilities = { wisdom = { score = 10, bonus = 0 } } })
+            local fRealGetBonus = EffectManager5E.getEffectsBonus
+            -- In FGC 5E manager_effect_5E.lua: if bModOnly then return nTotalMod, nEffectCount end
+            EffectManager5E.getEffectsBonus = function(node, aTypes, bFirst)
+                if aTypes[1] == "EXHAUSTION" then
+                    if bFirst then
+                        return 0, 1
+                    end
+                    return {}, 0, 1
+                end
+                if bFirst then
+                    return 0, 0
+                end
+                return {}, 0, 0
+            end
+            local bAdv, bDis, nMod = getAdvDisadvForPerception(mockPC)
+            EffectManager5E.getEffectsBonus = fRealGetBonus
+            IS_FGC = false
+            return bDis == true
+        `
+    );
+
+    await runAssert(
+        "fgc-exhaustion-no-exhaustion-no-nil-error",
+        true,
+        `
+            IS_FGC = true
+            local mockPC = createMockNode({ recordType = "pc", abilities = { wisdom = { score = 10, bonus = 0 } } })
+            local fRealGetBonus = EffectManager5E.getEffectsBonus
+            -- In FGC 5E, when no exhaustion exists, getEffectsBonus with bModOnly=true returns 0, 0
+            EffectManager5E.getEffectsBonus = function(node, aTypes, bFirst)
+                if bFirst then
+                    return 0, 0
+                end
+                return {}, 0, 0
+            end
+            local bOk, bAdv, bDis, nMod = pcall(function()
+                return getAdvDisadvForPerception(mockPC)
+            end)
+            EffectManager5E.getEffectsBonus = fRealGetBonus
+            IS_FGC = false
+            return bOk == true and bDis == false
+        `
+    );
+
+    await runAssert(
+        "fgc-onDrop-deduplication",
+        true,
+        `
+            IS_FGC = true
+            local nDropEventCalls = 0
+            local fRealOnDropEvent = onDropEvent
+            onDropEvent = function() nDropEventCalls = nDropEventCalls + 1 end
+
+            local mockDrag = { type = "number", getNumberData = function() return 15 end, getStringData = function() return "[SKILL] Stealth" end }
+            onDrop("ct", "combattracker.list.id-00001", mockDrag)
+            -- Immediate identical second drop should be ignored
+            onDrop("ct", "combattracker.list.id-00001", mockDrag)
+
+            onDropEvent = fRealOnDropEvent
+            IS_FGC = false
+            return nDropEventCalls == 1
+        `
+    );
+
+    await runAssert(
+        "fgc-getResultHandlerSafe-fallback",
+        true,
+        `
+            local fRealGetResultHandler = ActionsManager.getResultHandler
+            ActionsManager.getResultHandler = nil
+            local tSavedHandlers = ActionsManager.aHandlers
+            local tRegistered = {}
+            ActionsManager.aHandlers = nil
+            local fRealRegister = ActionsManager.registerResultHandler
+            ActionsManager.registerResultHandler = function(sType, fn)
+                tRegistered[sType] = fn
+            end
+
+            local bSkillCalled = false
+            local bAttackCalled = false
+            ActionSkill = { onRoll = function() bSkillCalled = true end }
+            ActionAttack = { onAttack = function() bAttackCalled = true end }
+
+            bStealthTrackerInitialized = false
+            onInit()
+
+            local fSkill = tRegistered["skill"]
+            local fAttack = tRegistered["attack"]
+            fSkill(createMockNode({ recordType = "pc" }), nil, { sType = "skill", sDesc = "[skill] stealth", aDice = { { type = "d20", result = 10 } } })
+            fAttack(createMockNode({ recordType = "pc" }), nil, { sType = "attack" })
+
+            ActionsManager.getResultHandler = fRealGetResultHandler
+            ActionsManager.aHandlers = tSavedHandlers
+            ActionsManager.registerResultHandler = fRealRegister
+            return bSkillCalled and bAttackCalled
+        `
+    );
+
+    await runAssert(
+        "fgc-getActorSafe-uses-resolveActor",
+        true,
+        `
+            IS_FGC = true
+            local mockNode = createMockNode({ recordType = "pc" })
+            local fRealGetActor = ActorManager.getActor
+            local fRealResolveActor = ActorManager.resolveActor
+            
+            -- Simulate FGC where getActor takes (sOldType, v) and returns nil when called with 1 arg
+            ActorManager.getActor = function(sOldType, v) return nil end
+            local bResolveCalled = false
+            ActorManager.resolveActor = function(v)
+                bResolveCalled = true
+                return { sCTNode = "mock.path", sType = "pc", sName = "MockPC" }
+            end
+            
+            local rActor = getActorSafe(mockNode)
+            
+            ActorManager.getActor = fRealGetActor
+            ActorManager.resolveActor = fRealResolveActor
+            IS_FGC = false
+            return bResolveCalled and rActor ~= nil and rActor.sName == "MockPC"
+        `
+    );
+
+    await runAssert(
+        "fgc-turn-activation-outputs-stealth-analysis",
+        true,
+        `
+            IS_FGC = true
+            USER_ISHOST = true
+            local tSavedOptions = OptionsManager_mock_options
+            OptionsManager_mock_options = {
+                ["STEALTHTRACKER_VISIBLE"] = "hidden",
+                ["STEALTHTRACKER_AWARE"] = "both",
+                ["STEALTHTRACKER_VERBOSE"] = "standard"
+            }
+
+            local mockPC = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                perception = 12
+            })
+            function mockPC.getPath() return "combattracker.list.id-00001" end
+
+            local mockGoblin = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                type = "humanoid",
+                name = "Goblin",
+                senses = "passive Perception 9",
+                effects = {
+                    id1 = { label = "Stealth: 18", isgmonly = 1 }
+                }
+            })
+            function mockGoblin.getPath() return "combattracker.list.id-00002" end
+
+            local fRealGetSorted = CombatManager.getSortedCombatantList
+            CombatManager.getSortedCombatantList = function()
+                return { mockPC, mockGoblin }
+            end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            -- Simulate clicking next turn in CT (turn activates on PC)
+            requestActivation(mockPC, false)
+
+            CombatManager.getSortedCombatantList = fRealGetSorted
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+            IS_FGC = false
+
+            return sLastChatMsg ~= nil
+               and sLastChatMsg:find("does not perceive") ~= nil
+               and sLastChatMsg:find("Stealth: 18") ~= nil
+        `
+    );
+
+    await runAssert(
+        "fgc-turn-activation-hiding-actor-unaware-analysis",
+        true,
+        `
+            IS_FGC = true
+            USER_ISHOST = true
+            local tSavedOptions = OptionsManager_mock_options
+            OptionsManager_mock_options = {
+                ["STEALTHTRACKER_VISIBLE"] = "hidden",
+                ["STEALTHTRACKER_AWARE"] = "both",
+                ["STEALTHTRACKER_VERBOSE"] = "standard"
+            }
+
+            local mockPC = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                name = "Valeros",
+                perception = 12
+            })
+            function mockPC.getPath() return "combattracker.list.id-00001" end
+
+            local mockGoblin = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                type = "humanoid",
+                name = "Goblin",
+                senses = "passive Perception 9",
+                effects = {
+                    id1 = { label = "Stealth: 18", isgmonly = 1 }
+                }
+            })
+            function mockGoblin.getPath() return "combattracker.list.id-00002" end
+
+            local fRealGetSorted = CombatManager.getSortedCombatantList
+            CombatManager.getSortedCombatantList = function()
+                return { mockPC, mockGoblin }
+            end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            -- Simulate clicking next turn in CT onto the hiding Goblin
+            requestActivation(mockGoblin, false)
+
+            CombatManager.getSortedCombatantList = fRealGetSorted
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+            IS_FGC = false
+
+            return sLastChatMsg ~= nil
+               and sLastChatMsg:find("is hidden from") ~= nil
+               and sLastChatMsg:find("Stealth: 18") ~= nil
+        `
+    );
+
+    // --- GROUP XIV: Attack From Stealth Message Generation ---
+    await runAssert(
+        "attack-from-stealth-adv-message-on-non-hiding-target",
+        true,
+        `
+            local tSavedOptions = {}
+            for k, v in pairs(OptionsManager_mock_options) do tSavedOptions[k] = v end
+            OptionsManager_mock_options["STEALTHTRACKER_VERBOSE"] = "standard"
+
+            local mockRogue = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                name = "Rogue",
+                perception = 14,
+                effects = {
+                    id1 = { label = "Stealth: 18", isgmonly = 0 }
+                }
+            })
+            function mockRogue.getPath() return "combattracker.list.id-00010" end
+
+            local mockGoblin = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                type = "humanoid",
+                name = "Goblin",
+                senses = "passive Perception 10"
+            })
+            function mockGoblin.getPath() return "combattracker.list.id-00011" end
+
+            local fRealGetActiveCT = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockRogue end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            local rSource = ActorManager.resolveActor(mockRogue)
+            local rTarget = ActorManager.resolveActor(mockGoblin)
+
+            displayProcessAttackFromStealth(rSource, rTarget)
+
+            CombatManager.getActiveCT = fRealGetActiveCT
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+
+            return sLastChatMsg ~= nil
+               and sLastChatMsg:find("Attacker is hidden. Attack at advantage%?") ~= nil
+               and sLastChatMsg:find("S: 18") ~= nil
+               and sLastChatMsg:find("PP: 10") ~= nil
+        `
+    );
+
+    await runAssert(
+        "attack-from-stealth-spotted-verbosity-max-vs-standard",
+        true,
+        `
+            local tSavedOptions = {}
+            for k, v in pairs(OptionsManager_mock_options) do tSavedOptions[k] = v end
+
+            local mockRogue = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                name = "Rogue",
+                perception = 10,
+                effects = {
+                    id1 = { label = "Stealth: 8", isgmonly = 0 }
+                }
+            })
+            function mockRogue.getPath() return "combattracker.list.id-00020" end
+
+            local mockGuard = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                name = "Guard",
+                senses = "passive Perception 14"
+            })
+            function mockGuard.getPath() return "combattracker.list.id-00021" end
+
+            local fRealGetActiveCT = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockRogue end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            local rSource = ActorManager.resolveActor(mockRogue)
+            local rTarget = ActorManager.resolveActor(mockGuard)
+
+            -- Standard verbosity: attacker spotted, so no chat message expected
+            OptionsManager_mock_options["STEALTHTRACKER_VERBOSE"] = "standard"
+            displayProcessAttackFromStealth(rSource, rTarget)
+            local bStandardNil = (sLastChatMsg == nil)
+
+            -- Re-add effect for max verbosity test
+            DB.setValue(mockRogue, "effects.id2.label", "string", "Stealth: 8")
+            OptionsManager_mock_options["STEALTHTRACKER_VERBOSE"] = "max"
+            sLastChatMsg = nil
+            displayProcessAttackFromStealth(rSource, rTarget)
+            local bMaxShowsNotHidden = (sLastChatMsg ~= nil and sLastChatMsg:find("Attacker not hidden") ~= nil)
+
+            CombatManager.getActiveCT = fRealGetActiveCT
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+
+            return bStandardNil and bMaxShowsNotHidden
+        `
+    );
+
+    await runAssert(
+        "fgc-end-to-end-attack-from-stealth-in-ct",
+        true,
+        `
+            local tSavedOptions = {}
+            for k, v in pairs(OptionsManager_mock_options) do tSavedOptions[k] = v end
+            OptionsManager_mock_options["STEALTHTRACKER_VERBOSE"] = "standard"
+            IS_FGC = true
+
+            local mockPC = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                name = "Shadow",
+                perception = 12,
+                effects = {
+                    id1 = { label = "Stealth: 17", isgmonly = 0 }
+                }
+            })
+            function mockPC.getPath() return "combattracker.list.id-00030" end
+
+            local mockTarget = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                name = "Orc",
+                senses = "passive Perception 11"
+            })
+            function mockTarget.getPath() return "combattracker.list.id-00031" end
+
+            local fRealGetActiveCT = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockPC end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            -- Simulate attack roll handler invocation in FGC
+            local rSource = ActorManager.resolveActor(mockPC)
+            local rTarget = ActorManager.resolveActor(mockTarget)
+            onRollAttack(rSource, rTarget, { sType = "attack" })
+
+            CombatManager.getActiveCT = fRealGetActiveCT
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+            IS_FGC = false
+
+            return sLastChatMsg ~= nil
+               and sLastChatMsg:find("Attacker is hidden. Attack at advantage%?") ~= nil
+               and sLastChatMsg:find("S: 17") ~= nil
+               and sLastChatMsg:find("PP: 11") ~= nil
+        `
+    );
+
+    await runAssert(
+        "attack-from-stealth-both-attacker-and-target-hidden",
+        true,
+        `
+            local tSavedOptions = {}
+            for k, v in pairs(OptionsManager_mock_options) do tSavedOptions[k] = v end
+            OptionsManager_mock_options["STEALTHTRACKER_VERBOSE"] = "standard"
+
+            local mockPC = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                name = "Shadow",
+                perception = 12,
+                effects = {
+                    id1 = { label = "Stealth: 17", isgmonly = 0 }
+                }
+            })
+            function mockPC.getPath() return "combattracker.list.id-00040" end
+
+            local mockNinja = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                name = "Ninja",
+                senses = "passive Perception 10",
+                effects = {
+                    id1 = { label = "Stealth: 19", isgmonly = 1 }
+                }
+            })
+            function mockNinja.getPath() return "combattracker.list.id-00041" end
+
+            local fRealGetActiveCT = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockPC end
+
+            local sLastChatMsg = nil
+            local fRealAddChatMessage = Comm.addChatMessage
+            Comm.addChatMessage = function(msg)
+                sLastChatMsg = msg.text
+            end
+
+            local rSource = ActorManager.resolveActor(mockPC)
+            local rTarget = ActorManager.resolveActor(mockNinja)
+            displayProcessAttackFromStealth(rSource, rTarget)
+
+            CombatManager.getActiveCT = fRealGetActiveCT
+            Comm.addChatMessage = fRealAddChatMessage
+            OptionsManager_mock_options = tSavedOptions
+
+            return sLastChatMsg ~= nil
+               and sLastChatMsg:find("Target hidden. Attack possible%?") ~= nil
+               and sLastChatMsg:find("Attacker is hidden. Attack at advantage%?") ~= nil
         `
     );
 

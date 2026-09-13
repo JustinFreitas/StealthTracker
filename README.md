@@ -3,7 +3,7 @@
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v5.7.2 by Justin Freitas
+StealthTracker v5.7.3 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -80,5 +80,6 @@ Changelist:
 - v5.7 - Generic Actions Hide fix: Avoid redundant advantage/disadvantage decoding in StealthTracker when Generic Actions or the ruleset has already decoded the roll, preventing duplicated '[ADV] [DROPPED ...]' chat output.
 - v5.7.1 - Console cleanup: Clean up verbose debug trace console statements across attack rolls, skill rolls, duplicate actor resolution, and turn checks.
 - v5.7.2 - Fix CT stealth effect and chat notifications: Restored roll resolution hooking via ActionsManager result handlers, ensuring skill and attack observers trigger reliably after ruleset processing. Fixed database node path resolution in turn and combat checks (handling userdata databasenodes in FGU) so rolls during an actor's turn properly apply the Stealth effect to the Combat Tracker and trigger awareness notifications. Also modernized CombatDropManager registration, standardized on DB package functions (DB.deleteNode, DB.getValue/setValue), and enforced strict Lua nil semantics.
+- v5.7.3 - Fantasy Grounds Classic (FGC) compatibility: Restored full dual FGC/FGU compatibility. In FGC, ActionsManager.getResultHandler is absent and its internal handler table is scoped locally, so getResultHandlerSafe now properly falls back to the ruleset's ActionSkill.onRoll and ActionAttack.onAttack handlers, fixing an issue where skill and attack roll resolutions were completely suppressed on FGC. Fixed getActorSafe on FGC where calling legacy 2-argument ActorManager.getActor returned nil, restoring CT turn activation Stealth analysis vs PP, NPC Stealth skill auto-population, and attack from stealth handling. Fixed attack from stealth advantage analysis where attacking a non-hiding target suppressed chat messages due to an erroneous target-stealth check in getFormattedPerformAttackFromStealth. Hardened actor and CT node path resolution in attack handlers, guarded CombatManager.requestActivation against recursion on reload, restored checkFGC() runtime detection, FGC CT onDrop event deduplication, and 2014 Exhaustion disadvantage in Passive Perception calculations.
 
 ![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)

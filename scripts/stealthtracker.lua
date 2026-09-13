@@ -11,7 +11,7 @@ local EFFECTS = "effects"
 local FORCE_DISPLAY = true
 local GENACTROLL = "genactroll"
 local HIDDEN = "hidden"
-local IS_FGC = false
+IS_FGC = false
 local LAST_DRAG_INFO = nil
 local LAST_NODE_NAME = nil
 local LAST_NODE_TYPE = nil
@@ -57,10 +57,10 @@ local A_SKILL_FILTER = {
     "wisdom"
 }
 
-local aOwnResultWrappers = {}
+aOwnResultWrappers = {}
 local CombatManager_onDrop, CombatManager_requestActivation
 local _bAbilityBonusWarningLogged = false
-local bStealthTrackerInitialized = false
+bStealthTrackerInitialized = false
 
 -- Helper to safely check if a string is blank, preferring the modern StringManager method.
 local function isBlankSafe(s)
@@ -86,24 +86,24 @@ local function getAbilityBonusSafe(nodeActor, sAbility)
     return 0
 end
 
--- Helper to safely check for effects, preferring the modern CoreRPG or 5E-specific EffectManager if available.
+-- Helper to safely check for effects, preferring 5E-specific EffectManager if available.
 local function hasEffectSafe(rActor, sEffect, rTarget, bTargetedOnly)
-    if EffectManager.hasEffect then
-        return EffectManager.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
-    end
     if EffectManager5E and EffectManager5E.hasEffect then
         return EffectManager5E.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
     end
-    return EffectManager.hasEffect(rActor, sEffect)
+    if EffectManager and EffectManager.hasEffect then
+        return EffectManager.hasEffect(rActor, sEffect, rTarget, bTargetedOnly)
+    end
+    return false
 end
 
--- Helper to safely get effects by type, preferring modern CoreRPG or 5E-specific EffectManager if available.
+-- Helper to safely get effects by type, preferring 5E-specific EffectManager if available.
 local function getEffectsByTypeSafe(nodeActor, sEffectType, aFilter, rTarget, bTargetedOnly)
-    if EffectManager.getEffectsByType then
-        return EffectManager.getEffectsByType(nodeActor, sEffectType, rTarget, bTargetedOnly)
-    end
     if EffectManager5E and EffectManager5E.getEffectsByType then
         return EffectManager5E.getEffectsByType(nodeActor, sEffectType, aFilter, rTarget, bTargetedOnly)
+    end
+    if EffectManager and EffectManager.getEffectsByType then
+        return EffectManager.getEffectsByType(nodeActor, sEffectType, rTarget, bTargetedOnly)
     end
     return {}
 end
@@ -112,6 +112,9 @@ end
 local function getEffectsBonusSafe(nodeActor, aEffectTypes, bFirstOnly, aFilter)
     if EffectManager5E and EffectManager5E.getEffectsBonus then
         return EffectManager5E.getEffectsBonus(nodeActor, aEffectTypes, bFirstOnly, aFilter)
+    end
+    if bFirstOnly then
+        return 0, 0
     end
     return {}, 0, 0
 end
@@ -125,7 +128,13 @@ local function getAbilityEffectsBonusSafe(nodeActor, sAbility)
 end
 
 -- Helper to safely get an actor from a node/string, preferring the modern getActor method.
-local function getActorSafe(v)
+-- Note: In FGC, ActorManager.getActor is a legacy 2-argument deprecated function (sActorOldType, v)
+-- that returns resolveActor(v). Calling it with 1 argument passes v as nil, returning nil.
+-- On FGC, resolveActor(v) must be used.
+function getActorSafe(v)
+    if IS_FGC or checkFGC() then
+        return ActorManager.resolveActor(v)
+    end
     if ActorManager.getActor then
         return ActorManager.getActor(v)
     end
@@ -142,7 +151,7 @@ end
 
 -- Helper to safely capture the ruleset's existing result handler for a roll type.
 -- ActionsManager.getResultHandler exists in FGU but not FGC, so fall back to the
--- internal handler table on classic before defaulting to nil.
+-- internal handler table or ruleset action manager before defaulting to nil.
 local function getResultHandlerSafe(sType)
     if ActionsManager.getResultHandler then
         return ActionsManager.getResultHandler(sType)
@@ -150,6 +159,11 @@ local function getResultHandlerSafe(sType)
     local aHandlers = ActionsManager.aRollHandlers or ActionsManager.aHandlers
     if type(aHandlers) == "table" and type(aHandlers[sType]) == "table" then
         return aHandlers[sType].fResultHandler
+    end
+    if sType == "skill" and ActionSkill and ActionSkill.onRoll then
+        return ActionSkill.onRoll
+    elseif sType == "attack" and ActionAttack and ActionAttack.onAttack then
+        return ActionAttack.onAttack
     end
     return nil
 end
@@ -175,7 +189,7 @@ local function getNodePathSafe(vNode)
 		return (vNode ~= "" and vNode) or nil
 	end
 	if (type(vNode) == "userdata" or type(vNode) == "table" or type(vNode) == "databasenode") and vNode.getPath then
-		local bOk, sPath = pcall(vNode.getPath)
+		local bOk, sPath = pcall(vNode.getPath, vNode)
 		if bOk and sPath and sPath ~= "" then return sPath end
 	end
 	if DB and DB.getPath then
@@ -193,12 +207,14 @@ function onInit()
 	if bStealthTrackerInitialized then return end
 	bStealthTrackerInitialized = true
 
+	IS_FGC = checkFGC()
+
 	LOCALIZED_DEXTERITY = Interface.getString(DEXTERITY)
 	LOCALIZED_DEXTERITY_LOWER = LOCALIZED_DEXTERITY:lower()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
-	USER_ISHOST = (Session and Session.IsHost) or User.isHost()
+	USER_ISHOST = (Session and Session.IsHost) or (User and User.isHost and User.isHost()) or false
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -246,12 +262,16 @@ function onInit()
 				end
 			end
 		else
-			CombatManager_onDrop = CombatManager.onDrop
-			CombatManager.onDrop = onDrop
+			if CombatManager.onDrop ~= onDrop then
+				CombatManager_onDrop = CombatManager.onDrop
+				CombatManager.onDrop = onDrop
+			end
 		end
 
-        CombatManager_requestActivation = CombatManager.requestActivation
-        CombatManager.requestActivation = requestActivation
+        if CombatManager.requestActivation ~= requestActivation then
+            CombatManager_requestActivation = CombatManager.requestActivation
+            CombatManager.requestActivation = requestActivation
+        end
 
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
@@ -427,9 +447,21 @@ end
 function checkFactionFilter()
 	return OptionsManager.isOption(STEALTHTRACKER_FACTION_FILTER, ON)
 end
-
-
-
+function checkFGC()
+    if UtilityManager and UtilityManager.isClientFGU then
+        return not UtilityManager.isClientFGU()
+    end
+    if Session and Session.VersionMajor then
+        return Session.VersionMajor < 4
+    end
+    if Interface and Interface.getVersion then
+        local sVersion = tostring(Interface.getVersion() or "")
+        local sMajor = sVersion:match("^(%d+)")
+        local nMajor = tonumber(sMajor) or 0
+        return nMajor < 4
+    end
+    return false
+end
 function checkShowEye()
     return OptionsManager.getOption(STEALTHTRACKER_SHOW_EYE) == ON
 end
@@ -489,11 +521,46 @@ end
 
 -- Logic to process an attack from stealth (for checking if enemies could have been attacked with advantage, etc).
 function displayProcessAttackFromStealth(rSource, rTarget)
-	-- if no source or no roll then exit, skipping StealthTracker processing.
-	if not rSource or rSource.sCTNode == nil or rSource.sCTNode == "" then return end
+	if not rSource then return end
 
-	-- Redirect rTarget to correct duplicate if applicable
+	local rSourceActor = getActorSafe(rSource)
+	if rSourceActor then
+		rSource = rSourceActor
+	end
+
+	-- Ensure rSource.sCTNode is populated if possible
+	if not rSource.sCTNode or rSource.sCTNode == "" then
+		local sCTNode = ActorManager.getCTNodeName(rSource)
+		if sCTNode and sCTNode ~= "" then
+			rSource.sCTNode = sCTNode
+		elseif rSource.sCreatureNode and rSource.sCreatureNode ~= "" and CombatManager and CombatManager.getCTFromNode then
+			local nodeSCT = CombatManager.getCTFromNode(rSource.sCreatureNode)
+			if nodeSCT then
+				rSource.sCTNode = getNodePathSafe(nodeSCT) or ""
+			end
+		end
+	end
+
+	-- if no source or no CT node then exit, skipping StealthTracker processing.
+	if not rSource or not rSource.sCTNode or rSource.sCTNode == "" then return end
+
 	if rTarget then
+		local rTargetActor = getActorSafe(rTarget)
+		if rTargetActor then
+			rTarget = rTargetActor
+		end
+		if not rTarget.sCTNode or rTarget.sCTNode == "" then
+			local sTCTNode = ActorManager.getCTNodeName(rTarget)
+			if sTCTNode and sTCTNode ~= "" then
+				rTarget.sCTNode = sTCTNode
+			elseif rTarget.sCreatureNode and rTarget.sCreatureNode ~= "" and CombatManager and CombatManager.getCTFromNode then
+				local nodeTCT = CombatManager.getCTFromNode(rTarget.sCreatureNode)
+				if nodeTCT then
+					rTarget.sCTNode = getNodePathSafe(nodeTCT) or ""
+				end
+			end
+		end
+		-- Redirect rTarget to correct duplicate if applicable
 		rTarget = resolveTargetDuplicateCTNode(rSource, rTarget)
 	end
 
@@ -503,7 +570,8 @@ function displayProcessAttackFromStealth(rSource, rTarget)
 
 	if not USER_ISHOST then
 		-- For clients notify of an action from stealth and then exit.  Host handler will pick up message and run code after this block.
-		notifyAttackFromStealth(rSource.sCTNode, (rTarget and rTarget.sCTNode) or "")
+		local sTargetCTNode = (rTarget and rTarget.sCTNode) or ""
+		notifyAttackFromStealth(rSource.sCTNode, sTargetCTNode)
 		return
 	end
 
@@ -670,7 +738,13 @@ function expireStealthEffectOnCTNode(rActor, aOutput)
 				insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sText)
 			end
 		else
-			EffectManager.expireEffect(nodeCT, nodeLastEffectWithStealth, 0)
+			if EffectManager and EffectManager.expireEffect then
+				EffectManager.expireEffect(nodeCT, nodeLastEffectWithStealth, 0)
+			elseif DB and DB.deleteNode then
+				DB.deleteNode(nodeLastEffectWithStealth)
+			elseif nodeLastEffectWithStealth.delete then
+				nodeLastEffectWithStealth.delete()
+			end
 		end
 	end
 end
@@ -728,27 +802,24 @@ function getFormattedPerformAttackFromStealth(rSource, rTarget, nStealthSource, 
 
 	aOutput = validateTableOrNew(aOutput)
 	local sMsgText
-    local rTargetHidden = isTargetHiddenFromSource(rSource, rTarget)
-	if rTargetHidden and not rTargetHidden.hidden then
-		local sStats = string.format("(%s %s: %d, %s PP: %d)",
-									 ActorManager.getDisplayName(rSource),
-									 LOCALIZED_STEALTH_ABV,
-									 nStealthSource,
-									 ActorManager.getDisplayName(rTarget),
-									 getPassivePerceptionNumber(rTarget))
-		if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
-			-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
-			sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
-		elseif checkVerbosityMax() then
-			-- Target sees the attack coming.  Build appropriate message.
-			sMsgText = string.format("Attacker not hidden. %s", sStats)
-		else
-			sMsgText = nil
-		end
+	local sStats = string.format("(%s %s: %d, %s PP: %d)",
+								 ActorManager.getDisplayName(rSource),
+								 LOCALIZED_STEALTH_ABV,
+								 nStealthSource,
+								 ActorManager.getDisplayName(rTarget),
+								 getPassivePerceptionNumber(rTarget))
+	if not doesTargetPerceiveAttackerFromStealth(nStealthSource, rTarget) then
+		-- Warn the chat that the attacker is hidden from the target in case they can take advantage on the roll (i.e. roll the attack again).
+		sMsgText = string.format("Attacker is hidden. Attack at advantage? %s", sStats)
+	elseif checkVerbosityMax() then
+		-- Target sees the attack coming.  Build appropriate message.
+		sMsgText = string.format("Attacker not hidden. %s", sStats)
+	else
+		sMsgText = nil
+	end
 
-		if sMsgText then
-			insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
-		end
+	if sMsgText then
+		insertFormattedTextWithSeparatorIfNonEmpty(aOutput, sMsgText)
 	end
 end
 
@@ -967,18 +1038,19 @@ function getAdvDisadvForPerception(rActor)
 
     -- Get ability modifiers
     local aAddDice, nAddMod, _ = getEffectsBonusSafe(rActor, {"CHECK"}, false, A_CHECK_FILTER)
+    nAddMod = nAddMod or 0
     local aSkillAddDice, nSkillAddMod, nSkillEffectCount = getEffectsBonusSafe(rActor, {"SKILL"}, false, A_SKILL_FILTER)
-    if (nSkillEffectCount > 0) then
-        for _,v in ipairs(aSkillAddDice) do
+    if (nSkillEffectCount and nSkillEffectCount > 0) then
+        for _,v in ipairs(aSkillAddDice or {}) do
             table.insert(aAddDice, v)
         end
-        nAddMod = nAddMod + nSkillAddMod;
+        nAddMod = nAddMod + (nSkillAddMod or 0);
     end
 
     -- Get ability modifiers
     local nBonusStat, nBonusEffects = getAbilityEffectsBonusSafe(rActor, "wisdom")
-    if nBonusEffects > 0 then
-        nAddMod = nAddMod + nBonusStat
+    if (nBonusEffects and nBonusEffects > 0) then
+        nAddMod = nAddMod + (nBonusStat or 0)
     end
 
     -- Exhaustion handling, presence-driven and FGC/FGU aware (we never interpret the effect's numeric value,
@@ -989,6 +1061,13 @@ function getAdvDisadvForPerception(rActor)
     -- -2/level penalty that arrives through the CHECK channel summed above); rather than guess the edition we
     -- defer to whatever that ruleset surfaces through the effect channels and do not assert disadvantage here,
     -- which avoids double-counting the 2024 penalty.
+    -- In 5E manager_effect_5E.lua, getEffectsBonus(rActor, {"EXHAUSTION"}, true) returns (nTotalMod, nEffectCount).
+    if IS_FGC or checkFGC() then
+        local _, nExhaustCount = getEffectsBonusSafe(rActor, {"EXHAUSTION"}, true)
+        if (nExhaustCount and nExhaustCount > 0) or hasEffectSafe(rActor, "EXHAUSTION") then
+            bDIS = true
+        end
+    end
 
 
     return bADV, bDIS, nAddMod
@@ -1236,7 +1315,7 @@ function modifyPassivePerceptionForActorEffects(rActor, nPP)
     local bAdv, bDisadv, nAddMod = getAdvDisadvForPerception(rActor)
     local nAdvBonus = bAdv and 5 or 0
     local nDisadvPenalty = bDisadv and -5 or 0
-    return nPP + nAdvBonus + nDisadvPenalty + nAddMod
+    return (nPP or 10) + nAdvBonus + nDisadvPenalty + (nAddMod or 0)
 end
 
 -- Function to notify the host of a stealth update so that the host can update items with proper permissions.
@@ -1281,7 +1360,21 @@ function onCombatResetEvent()
 end
 
 function onDrop(nodetype, nodename, draginfo)
+	-- In FGC, the drop event fires twice on CT entries without this deduping guard.
+	if IS_FGC or checkFGC() then
+		if LAST_DRAG_INFO == draginfo and
+		   LAST_NODE_NAME == nodename and
+		   LAST_NODE_TYPE == nodetype then
+			LAST_DRAG_INFO = nil
+			LAST_NODE_NAME = nil
+			LAST_NODE_TYPE = nil
+			return
+		end
 
+		LAST_DRAG_INFO = draginfo
+		LAST_NODE_NAME = nodename
+		LAST_NODE_TYPE = nodetype
+	end
 
 	local rSource = ActionsManager.decodeActors(draginfo)
 	local rTarget = getActorSafe(nodename)
@@ -1325,6 +1418,16 @@ function onInitiateSkill(rSource, rTarget, rRoll)
 end
 
 function onRollAttack(rSource, rTarget, rRoll)
+	if rSource and (not rSource.sCTNode or rSource.sCTNode == "") then
+		local nodeCT = ActorManager.getCTNode(rSource)
+		if not nodeCT and rSource.sCreatureNode and rSource.sCreatureNode ~= "" and CombatManager and CombatManager.getCTFromNode then
+			nodeCT = CombatManager.getCTFromNode(rSource.sCreatureNode)
+		end
+		if nodeCT then
+			rSource.sCTNode = getNodePathSafe(nodeCT) or ""
+		end
+	end
+
 	-- Redirect rSource.sCTNode to active duplicate CT node if applicable
 	if rSource and rSource.sCTNode and rSource.sCTNode ~= "" then
 		local sNewPath = getActiveDuplicateCTNodePath(rSource.sCTNode)
@@ -1408,13 +1511,18 @@ function processHostOnlySubcommands(sSubcommand)
 end
 
 function requestActivation(nodeEntry, bSkipBell)
-    if type(CombatManager_requestActivation) == "function" then
+    if type(CombatManager_requestActivation) == "function" and CombatManager_requestActivation ~= requestActivation then
         CombatManager_requestActivation(nodeEntry, bSkipBell)
     end
     if not isValidCTNode(nodeEntry) then return end
 
-    ensureStealthSkillExistsOnNpc(nodeEntry)
-	displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
+    local bOk, sErr = pcall(function()
+        ensureStealthSkillExistsOnNpc(nodeEntry)
+        displayStealthCheckInformationWithConditionAndVerboseChecks(nodeEntry, false)
+    end)
+    if not bOk and Debug and Debug.console then
+        Debug.console("StealthTracker: error in requestActivation: " .. tostring(sErr))
+    end
 end
 
 -- Function to encapsulate the setting of the name with stealth value.
