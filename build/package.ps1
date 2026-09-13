@@ -4,7 +4,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repoRoot = Resolve-Path "$PSScriptRoot\.."
 $outDir = "$repoRoot\build\out"
 $zipPath = "$outDir\StealthTracker.zip"
-$extPath = "C:\Users\justi\AppData\Roaming\SmiteWorks\Fantasy Grounds\extensions\StealthTracker.ext"
+$extPath = "$env:APPDATA\SmiteWorks\Fantasy Grounds\extensions\StealthTracker.ext"
 
 if (-not (Test-Path $outDir)) {
     New-Item -ItemType Directory -Path $outDir | Out-Null

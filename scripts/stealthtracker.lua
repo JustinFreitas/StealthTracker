@@ -57,7 +57,8 @@ local A_SKILL_FILTER = {
     "wisdom"
 }
 
-local ActionSkill_onRoll_Ruleset, ActionAttack_onAttack_Ruleset, ActionSkill_onRoll_Original, CombatManager_onDrop, CombatManager_requestActivation
+local aOwnResultWrappers = {}
+local CombatManager_onDrop, CombatManager_requestActivation
 local _bAbilityBonusWarningLogged = false
 local bStealthTrackerInitialized = false
 
@@ -167,6 +168,23 @@ local function isRollAdvantageDecoded(rRoll)
 	return false
 end
 
+-- Helper to safely extract database node path from a databasenode (userdata/databasenode in FGU), mock table, or string.
+local function getNodePathSafe(vNode)
+	if not vNode then return nil end
+	if type(vNode) == "string" then
+		return (vNode ~= "" and vNode) or nil
+	end
+	if (type(vNode) == "userdata" or type(vNode) == "table" or type(vNode) == "databasenode") and vNode.getPath then
+		local bOk, sPath = pcall(vNode.getPath)
+		if bOk and sPath and sPath ~= "" then return sPath end
+	end
+	if DB and DB.getPath then
+		local bOk, sPath = pcall(DB.getPath, vNode)
+		if bOk and sPath and sPath ~= "" then return sPath end
+	end
+	return nil
+end
+
 -- This function is required for all extensions to initialize variables and spit out the copyright and name of the extension as it loads
 function onInit()
 	-- Guard against onInit() running more than once in the same session (e.g. a script/extension
@@ -180,13 +198,7 @@ function onInit()
 	LOCALIZED_STEALTH = Interface.getString("skill_value_stealth")
 	LOCALIZED_STEALTH_ABV = LOCALIZED_STEALTH:sub(1, 1)
 	LOCALIZED_STEALTH_LOWER = LOCALIZED_STEALTH:lower()
-	USER_ISHOST = User.isHost()
-
-    -- Initiation hook (for forcing secret rolls)
-    if ActionSkill then
-        ActionSkill_onRoll_Original = ActionSkill.onRoll
-        ActionSkill.onRoll = onInitiateSkill
-    end
+	USER_ISHOST = (Session and Session.IsHost) or User.isHost()
 
 	-- Only set up the Custom Turn, Combat Reset, Custom Drop, and OOB Message event handlers on the host machine because it has access/permission to all of the necessary data.
 	if USER_ISHOST then
@@ -223,9 +235,16 @@ function onInit()
 
             CombatManager.setCustomCombatReset(onCombatResetEvent)
 		-- Drop onto CT hook for GM to drag a stealth roll or check onto a CT actor for a quick Stealth effect set (works for actors who's turn it isn't).
-		if CombatDropManager then
-			CombatManager_onDrop = CombatDropManager.onLegacyDropEvent
-			CombatDropManager.onLegacyDropEvent = onDrop
+		if CombatDropManager and CombatDropManager.registerLegacyDropCallback then
+			CombatDropManager.registerLegacyDropCallback(onDropEvent)
+		elseif CombatDropManager and CombatDropManager.onLegacyDropEvent then
+			local fOriginalLegacyDrop = CombatDropManager.onLegacyDropEvent
+			CombatDropManager.onLegacyDropEvent = function(rSource, rTarget, draginfo)
+				onDropEvent(rSource, rTarget, draginfo)
+				if fOriginalLegacyDrop then
+					fOriginalLegacyDrop(rSource, rTarget, draginfo)
+				end
+			end
 		else
 			CombatManager_onDrop = CombatManager.onDrop
 			CombatManager.onDrop = onDrop
@@ -241,58 +260,37 @@ function onInit()
 		Comm.registerSlashHandler("stealth", processChatCommand)
 	end
 
-	-- Observe roll resolution AFTER the ruleset's own result handler has run, via CoreRPG's
-	-- GameManager "onActionPostResolve" layered hook. We deliberately do NOT replace the registered
-	-- result handlers to prevent stack overflows and swallowed rolls.
-	if GameManager and GameManager.setMultiKeyFunction and GameManager.getMultiKeyFunction then
-		local aRollTypes = { "skill", "attack" }
-		for _, sType in ipairs(aRollTypes) do
-			local fObserver = (sType == "attack") and onRollAttack or onRollSkill
-			local fPrevious = GameManager.getMultiKeyFunction("onActionPostResolve", sType)
-			GameManager.setMultiKeyFunction("onActionPostResolve", sType, function(rSource, rTarget, rRoll)
-				if fPrevious then
-					local bPrevStatus, sPrevError = pcall(fPrevious, rSource, rTarget, rRoll)
-					if not bPrevStatus and Debug and Debug.console then
-						Debug.console("StealthTracker previous hook error: " .. tostring(sPrevError))
-					end
-				end
-				local bStatus, sError = pcall(fObserver, rSource, rTarget, rRoll)
-				if not bStatus and Debug and Debug.console then
-					Debug.console("StealthTracker observer error: " .. tostring(sError))
-				end
-			end)
+	-- Hook roll resolution via ActionsManager.
+	-- We capture the existing result handler (from ruleset or prior extensions), execute it first,
+	-- and then execute our observer (onRollSkill / onRollAttack) to process Stealth effects and chat.
+	local aRollTypes = { "skill", "attack" }
+	for _, sType in ipairs(aRollTypes) do
+		local bAttack = (sType == "attack")
+		local fObserver = bAttack and onRollAttack or onRollSkill
+		local fOriginal = getResultHandlerSafe(sType)
+		while fOriginal and aOwnResultWrappers[fOriginal] and aOwnResultWrappers[fOriginal] ~= true do
+			fOriginal = aOwnResultWrappers[fOriginal]
 		end
-	else
-		-- Fallback for CoreRPG versions without the GameManager layered hooks.
-		local aOwnWrappers = {}
-		local fSkillFallback = getResultHandlerSafe("skill")
-		local fAttackFallback = getResultHandlerSafe("attack")
-		local aRollTypes = { "skill", "attack" }
-		for _, sType in ipairs(aRollTypes) do
-			local bAttack = (sType == "attack")
-			local fObserver = bAttack and onRollAttack or onRollSkill
-			local fOriginal = getResultHandlerSafe(sType)
-			if not fOriginal then
-				fOriginal = bAttack and fAttackFallback or fSkillFallback
-			end
-			if fOriginal and aOwnWrappers[fOriginal] then
-				if Debug and Debug.console then
-					Debug.console("StealthTracker: refused self-capture of result handler for roll type: " .. sType)
-				end
-				fOriginal = nil
-			end
-			local fWrapper = function(rSource, rTarget, rRoll)
-				if fOriginal then
-					fOriginal(rSource, rTarget, rRoll)
-				end
-				local bStatus, sError = pcall(fObserver, rSource, rTarget, rRoll)
-				if not bStatus and Debug and Debug.console then
-					Debug.console("StealthTracker observer error (fallback): " .. tostring(sError))
-				end
-			end
-			aOwnWrappers[fWrapper] = true
-			ActionsManager.registerResultHandler(sType, fWrapper)
+		if fOriginal and aOwnResultWrappers[fOriginal] == true then
+			fOriginal = nil
 		end
+		local fWrapper = function(rSource, rTarget, rRoll)
+			if not bAttack and rRoll and isStealthSkillRoll(rRoll.sDesc) then
+				local nodeSourceCT = ActorManager.getCTNode(rSource)
+				if isPlayerStealthInfoDisabled() or (nodeSourceCT and CombatManager.isCTHidden(nodeSourceCT)) then
+					rRoll.bSecret = true
+				end
+			end
+			if fOriginal then
+				fOriginal(rSource, rTarget, rRoll)
+			end
+			local bStatus, sError = pcall(fObserver, rSource, rTarget, rRoll)
+			if not bStatus and Debug and Debug.console then
+				Debug.console("StealthTracker observer error: " .. tostring(sError))
+			end
+		end
+		aOwnResultWrappers[fWrapper] = fOriginal or true
+		ActionsManager.registerResultHandler(sType, fWrapper)
 	end
 
 	-- Compatibility with Generic Actions extension so that Hide action is treated as Stealth skill check.
@@ -319,11 +317,15 @@ end
 function getActiveDuplicateCTNodePath(sCTNode)
 	local nodeCT = ActorManager.getCTNode(sCTNode)
 	local nodeActiveCT = CombatManager.getActiveCT()
-	if nodeCT and nodeActiveCT and type(nodeCT) == "table" and type(nodeActiveCT) == "table" and nodeCT.getPath and nodeActiveCT.getPath and nodeCT.getPath() ~= nodeActiveCT.getPath() then
+	local sNodePath = getNodePathSafe(nodeCT)
+	local sActivePath = getNodePathSafe(nodeActiveCT)
+	if sNodePath and sActivePath and sNodePath ~= sActivePath then
 		local nodeCreature = ActorManager.getCreatureNode(nodeCT)
 		local nodeActiveCreature = ActorManager.getCreatureNode(nodeActiveCT)
-		if nodeCreature and nodeActiveCreature and nodeCreature.getPath and nodeActiveCreature.getPath and nodeCreature.getPath() == nodeActiveCreature.getPath() then
-			return nodeActiveCT.getPath()
+		local sCreaturePath = getNodePathSafe(nodeCreature)
+		local sActiveCreaturePath = getNodePathSafe(nodeActiveCreature)
+		if sCreaturePath and sCreaturePath == sActiveCreaturePath then
+			return sActivePath
 		end
 	end
 	return sCTNode
@@ -370,7 +372,9 @@ function resolveTargetDuplicateCTNode(rSource, rTarget)
 		end
 	end
 	
-	if nodeHighestStealthCT and nodeHighestStealthCT.getPath() ~= nodeTargetCT.getPath() then
+	local sHighestPath = getNodePathSafe(nodeHighestStealthCT)
+	local sTargetCTPath = getNodePathSafe(nodeTargetCT)
+	if sHighestPath and sTargetCTPath and sHighestPath ~= sTargetCTPath then
 		local rNewTarget = ActorManager.resolveActor(nodeHighestStealthCT)
 		if rNewTarget then
 			return rNewTarget
@@ -385,11 +389,11 @@ function checkAndDisplayAllowOutOfCombatAndTurnChecks(vActor)
 
 	local nodeCT = ActorManager.getCTNode(vActor)
 	local nodeActiveCT = CombatManager.getActiveCT()
-	local sNodeCTPath = (nodeCT and type(nodeCT) == "table" and nodeCT.getPath and nodeCT.getPath()) or (type(nodeCT) == "string" and nodeCT) or (type(vActor) == "string" and vActor) or "nil"
-	local sActiveCTPath = (nodeActiveCT and type(nodeActiveCT) == "table" and nodeActiveCT.getPath and nodeActiveCT.getPath()) or (type(nodeActiveCT) == "string" and nodeActiveCT) or "nil"
+	local sNodeCTPath = getNodePathSafe(nodeCT) or getNodePathSafe(vActor)
+	local sActiveCTPath = getNodePathSafe(nodeActiveCT)
 	local bAllowOutOfTurn = checkAllowOutOfTurn()
 
-	if sActiveCTPath ~= sNodeCTPath and not bAllowOutOfTurn then
+	if (not sActiveCTPath or sActiveCTPath ~= sNodeCTPath) and not bAllowOutOfTurn then
 		if checkVerbosityMax() then
 			displayChatMessage(string.format(ST_STEALTH_DISABLED_OUT_OF_FORMAT, TURN), SECRET)
 		end
@@ -444,7 +448,11 @@ function deleteAllStealthEffects(nodeCT)
 
 	for _, nodeEffect in pairs(DB.getChildren(nodeCT, EFFECTS)) do
 		if getStealthValueFromEffectNode(nodeEffect) then
-			nodeEffect.delete()
+			if DB and DB.deleteNode then
+				DB.deleteNode(nodeEffect)
+			elseif nodeEffect.delete then
+				nodeEffect.delete()
+			end
 		end
 	end
 end
@@ -627,18 +635,14 @@ function ensureStealthSkillExistsOnNpc(nodeCT)
 	end
 
 	sStealthWithMod = sStealthWithMod .. nDexMod -- Ex: Stealth +0 or Stealth -2
-	local rSkillsNode = nodeCT.getChild("skills")
-	if not rSkillsNode then  -- NPC sheets are not guaranteed to have the Skills node.
+	local sSkills = DB.getValue(nodeCT, "skills", "")
+	if sSkills == "" then
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
-	else
-		local sSkills = rSkillsNode.getText()
-		-- Skip if Stealth is already there because resetting it due to dex change mid-combat would be rare and might not account for other modifiers.
-		if not sSkills:match(LOCALIZED_STEALTH .. " [+-]%d") then
-			-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
-			local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
-			-- Trim off any trailing comma followed by zero or more whitespace.
-			rSkillsNode.setValue(sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
-		end
+	elseif not sSkills:match(LOCALIZED_STEALTH .. " [+-]%d") then
+		-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
+		local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
+		-- Trim off any trailing comma followed by zero or more whitespace.
+		DB.setValue(nodeCT, "skills", "string", sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
 	end
 end
 
@@ -1312,17 +1316,12 @@ end
 function onInitiateSkill(rSource, rTarget, rRoll)
 	local bProcessStealth = rSource and rRoll and isStealthSkillRoll(rRoll.sDesc)
 
-	-- If we are processing stealth, update the roll display to remove any existing stealth info.
 	if bProcessStealth then
-		if isPlayerStealthInfoDisabled() or (isNpc(rSource) and CombatManager.isCTHidden(rSource)) then
+		local nodeSourceCT = ActorManager.getCTNode(rSource)
+		if isPlayerStealthInfoDisabled() or (nodeSourceCT and CombatManager.isCTHidden(nodeSourceCT)) then
 			rRoll.bSecret = true
 		end
 	end
-
-    -- Call the ruleset's initiation handler.
-    if type(ActionSkill_onRoll_Original) == "function" then
-	    ActionSkill_onRoll_Original(rSource, rTarget, rRoll)
-    end
 end
 
 function onRollAttack(rSource, rTarget, rRoll)

@@ -3,7 +3,7 @@ StealthTracker
 https://github.com/JustinFreitas/StealthTracker
 
 
-StealthTracker v5.7.1 by Justin Freitas
+StealthTracker v5.7.2 by Justin Freitas
 
 ReadMe and Usage Notes
 
@@ -79,3 +79,4 @@ Changelist:
 - v5.6 - Stealth effect privacy fix: Fixed issue where Stealth effects remained visible to players on Combat Tracker when 'Player: Show Stealth info' option was set to None. Explicitly set isgmonly flag on created effect database nodes for GM-only stealth effects and suppressed chat announcements when player stealth info is disabled.
 - v5.7 - Generic Actions Hide fix: Avoid redundant advantage/disadvantage decoding in StealthTracker when Generic Actions or the ruleset has already decoded the roll, preventing duplicated '[ADV] [DROPPED ...]' chat output.
 - v5.7.1 - Console cleanup: Clean up verbose debug trace console statements across attack rolls, skill rolls, duplicate actor resolution, and turn checks.
+- v5.7.2 - Fix CT stealth effect and chat notifications: Restored roll resolution hooking via ActionsManager result handlers, ensuring skill and attack observers trigger reliably after ruleset processing. Fixed database node path resolution in turn and combat checks (handling userdata databasenodes in FGU) so rolls during an actor's turn properly apply the Stealth effect to the Combat Tracker and trigger awareness notifications. Also modernized CombatDropManager registration, standardized on DB package functions (DB.deleteNode, DB.getValue/setValue), and enforced strict Lua nil semantics.

@@ -188,10 +188,16 @@ async function runTests() {
             end
         end
 
+        function DB.deleteNode(node)
+            if type(node) == "table" and type(node.delete) == "function" then
+                node.delete()
+            end
+        end
+
         -- Mock OptionsManager
         OptionsManager_mock_options = {}
         function OptionsManager.getOption(key) return OptionsManager_mock_options[key] or "off" end
-        function OptionsManager.isOption(key, val) return false end
+        function OptionsManager.isOption(key, val) return OptionsManager_mock_options[key] == val end
 
         -- Mock EffectManager hasEffect to avoid nil calls
         function EffectManager.hasEffect(rActor, sEffect)
@@ -245,16 +251,9 @@ async function runTests() {
 
     // --- GROUP B: Settings & Flags ---
     await runAssert("checkAllowOutOfCombat() default", false, "return checkAllowOutOfCombat()");
-    await lua.doString(`
-        function OptionsManager.isOption(key, val)
-            if key == "STEALTHTRACKER_ALLOW_OUT_OF" and val == "all" then return true end
-            return false
-        end
-    `);
+    await lua.doString(`OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "all"`);
     await runAssert("checkAllowOutOfCombat() enabled", true, "return checkAllowOutOfCombat()");
-    
-    // Reset isOption stub
-    await lua.doString(`function OptionsManager.isOption() return false end`);
+    await lua.doString(`OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "off"`);
 
     // --- GROUP C: Roll Type Identification ---
     await runAssert("isStealthSkillRoll('[skill] stealth')", "[skill] stealth", "return isStealthSkillRoll('[skill] stealth')");
@@ -426,47 +425,40 @@ async function runTests() {
         end
 
         -- Mock ruleset original result handlers
-        function mockRulesetOnSkillRoll() end
-        function mockRulesetOnAttackRoll() end
+        nRulesetSkillCalls = 0
+        nRulesetAttackCalls = 0
+        function mockRulesetOnSkillRoll() nRulesetSkillCalls = nRulesetSkillCalls + 1 end
+        function mockRulesetOnAttackRoll() nRulesetAttackCalls = nRulesetAttackCalls + 1 end
         ActionsManager.registerResultHandler("skill", mockRulesetOnSkillRoll)
         ActionsManager.registerResultHandler("attack", mockRulesetOnAttackRoll)
-
-        -- Mock CoreRPG GameManager layered hook registry
-        GameManager = {}
-        GameManager.aMultiKey = {}
-        function GameManager.setMultiKeyFunction(sKey, sSubKey, fn)
-            GameManager.aMultiKey[sKey] = GameManager.aMultiKey[sKey] or {}
-            GameManager.aMultiKey[sKey][sSubKey or ""] = fn
-        end
-        function GameManager.getMultiKeyFunction(sKey, sSubKey)
-            return GameManager.aMultiKey[sKey] and GameManager.aMultiKey[sKey][sSubKey or ""]
-        end
-
-        -- Mock pre-existing GameManager post-resolve hook to verify chaining
-        prevPostResolveCalls = 0
-        GameManager.setMultiKeyFunction("onActionPostResolve", "attack", function()
-            prevPostResolveCalls = prevPostResolveCalls + 1
-        end)
 
         -- Execute onInit to install observers/wrappers
         onInit()
     `);
 
     await runAssert(
-        "observers-installed-via-GameManager",
+        "observers-installed-via-ActionsManager",
         true,
         `
-            return type(GameManager.getMultiKeyFunction("onActionPostResolve", "skill")) == "function"
-               and type(GameManager.getMultiKeyFunction("onActionPostResolve", "attack")) == "function"
+            return type(ActionsManager.getResultHandler("skill")) == "function"
+               and type(ActionsManager.getResultHandler("attack")) == "function"
+               and ActionsManager.getResultHandler("skill") ~= mockRulesetOnSkillRoll
+               and ActionsManager.getResultHandler("attack") ~= mockRulesetOnAttackRoll
         `
     );
 
     await runAssert(
-        "ruleset-handlers-untouched",
+        "ruleset-handlers-chained-by-wrapper",
         true,
         `
-            return ActionsManager.aHandlers["skill"] == mockRulesetOnSkillRoll
-               and ActionsManager.aHandlers["attack"] == mockRulesetOnAttackRoll
+            local nPrevSkill = nRulesetSkillCalls
+            local nPrevAttack = nRulesetAttackCalls
+            local fSkill = ActionsManager.getResultHandler("skill")
+            local fAttack = ActionsManager.getResultHandler("attack")
+            local rSource = createMockNode({ recordType = "pc" })
+            fSkill(rSource, nil, { sType = "skill", sDesc = "[skill] perception" })
+            fAttack(rSource, nil, { sType = "attack" })
+            return (nRulesetSkillCalls == nPrevSkill + 1) and (nRulesetAttackCalls == nPrevAttack + 1)
         `
     );
 
@@ -474,9 +466,11 @@ async function runTests() {
         "double-init-is-noop (idempotent init guard)",
         true,
         `
-            local fBefore = GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+            local fBeforeSkill = ActionsManager.getResultHandler("skill")
+            local fBeforeAttack = ActionsManager.getResultHandler("attack")
             onInit()
-            return fBefore == GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+            return fBeforeSkill == ActionsManager.getResultHandler("skill")
+               and fBeforeAttack == ActionsManager.getResultHandler("attack")
         `
     );
 
@@ -488,11 +482,12 @@ async function runTests() {
             local fRealDisplay = displayProcessAttackFromStealth
             displayProcessAttackFromStealth = function() nAttackObserved = nAttackObserved + 1 end
 
-            local fAttackSlot = GameManager.getMultiKeyFunction("onActionPostResolve", "attack")
+            local fAttackSlot = ActionsManager.getResultHandler("attack")
             local rSource = createMockNode({ recordType = "pc" })
-            fAttackSlot(rSource, nil, { sType = "attack" })
+            local ok, err = pcall(fAttackSlot, rSource, nil, { sType = "attack" })
 
             displayProcessAttackFromStealth = fRealDisplay
+            if not ok then error(err) end
             return nAttackObserved
         `
     );
@@ -505,11 +500,12 @@ async function runTests() {
             local fRealDisplay = displayProcessStealthUpdateForSkillHandlers
             displayProcessStealthUpdateForSkillHandlers = function() nSkillObserved = nSkillObserved + 1 end
 
-            local fSkillSlot = GameManager.getMultiKeyFunction("onActionPostResolve", "skill")
+            local fSkillSlot = ActionsManager.getResultHandler("skill")
             local rSource = createMockNode({ recordType = "pc" })
-            fSkillSlot(rSource, nil, { sType = "skill", sDesc = "[skill] stealth" })
+            local ok, err = pcall(fSkillSlot, rSource, nil, { sType = "skill", sDesc = "[skill] stealth", aDice = { { type = "d20", result = 15 } } })
 
             displayProcessStealthUpdateForSkillHandlers = fRealDisplay
+            if not ok then error(err) end
             return nSkillObserved
         `
     );
@@ -839,6 +835,7 @@ async function runTests() {
 
             -- Second invocation on same roll must be a no-op (idempotent)
             onRollSkill(mockSource, nil, rRollRaw)
+
             local bCallsStillOne = (nDecodeCalls == 1)
             local bDescStillSingle = (rRollRaw.sDesc == "[SKILL] Stealth [ADV] [DROPPED 2]")
 
@@ -878,6 +875,239 @@ async function runTests() {
             setNodeWithStealthValue = fRealSetNode
             OptionsManager.isOption = fRealIsOption
             return lastStealthRecorded == 16
+        `
+    );
+
+    // --- GROUP O: Turn Checks & End-to-End Stealth Roll Resolution ---
+    await runAssert(
+        "turn-check-in-combat-in-turn",
+        true,
+        `
+            local node1 = createMockNode({ recordType = "pc" })
+            function node1.getPath() return "combattracker.list.id-00001" end
+
+            local fRealActive = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return node1 end
+
+            local bAllow = checkAndDisplayAllowOutOfCombatAndTurnChecks(node1)
+            CombatManager.getActiveCT = fRealActive
+            return bAllow
+        `
+    );
+
+    await runAssert(
+        "turn-check-out-of-turn-blocked",
+        false,
+        `
+            local node1 = createMockNode({ recordType = "pc" })
+            function node1.getPath() return "combattracker.list.id-00001" end
+            local node2 = createMockNode({ recordType = "npc" })
+            function node2.getPath() return "combattracker.list.id-00002" end
+
+            local fRealActive = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return node2 end
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "off"
+
+            local bAllow = checkAndDisplayAllowOutOfCombatAndTurnChecks(node1)
+            CombatManager.getActiveCT = fRealActive
+            return bAllow
+        `
+    );
+
+    await runAssert(
+        "turn-check-out-of-turn-allowed-when-option-enabled",
+        true,
+        `
+            local node1 = createMockNode({ recordType = "pc" })
+            function node1.getPath() return "combattracker.list.id-00001" end
+            local node2 = createMockNode({ recordType = "npc" })
+            function node2.getPath() return "combattracker.list.id-00002" end
+
+            local fRealActive = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return node2 end
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "turn"
+
+            local bAllow = checkAndDisplayAllowOutOfCombatAndTurnChecks(node1)
+            CombatManager.getActiveCT = fRealActive
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "off"
+            return bAllow
+        `
+    );
+
+    await runAssert(
+        "pc-stealth-roll-end-to-end-resolves-effect",
+        true,
+        `
+            local lastEffectAdded = nil
+            local fRealAddEffect = EffectManager.addEffect
+            EffectManager.addEffect = function(sUser, sIdentity, nodeCT, rEffect, bShowMsg)
+                lastEffectAdded = rEffect
+            end
+
+            local mockPC = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                initresult = 12,
+                effects = {}
+            })
+            function mockPC.getPath() return "combattracker.list.id-00001" end
+
+            local fRealGetCTNode = ActorManager.getCTNode
+            ActorManager.getCTNode = function(s) return mockPC end
+
+            local fRealActive = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockPC end
+
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "off"
+            OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "all"
+
+            local fSkillHandler = ActionsManager.getResultHandler("skill")
+            local rRoll = {
+                sType = "skill",
+                sDesc = "[SKILL] Stealth [MOD:5]",
+                aDice = { { type = "d20", result = 14 } },
+                nMod = 5
+            }
+            local rSource = { sCTNode = "combattracker.list.id-00001" }
+
+            fSkillHandler(rSource, nil, rRoll)
+
+            EffectManager.addEffect = fRealAddEffect
+            ActorManager.getCTNode = fRealGetCTNode
+            CombatManager.getActiveCT = fRealActive
+
+            return lastEffectAdded ~= nil
+               and lastEffectAdded.sName == "Stealth: 19"
+               and lastEffectAdded.nGMOnly == 0
+        `
+    );
+
+    await runAssert(
+        "npc-stealth-roll-end-to-end-resolves-gm-only-effect",
+        true,
+        `
+            local lastEffectAdded = nil
+            local fRealAddEffect = EffectManager.addEffect
+            EffectManager.addEffect = function(sUser, sIdentity, nodeCT, rEffect, bShowMsg)
+                lastEffectAdded = rEffect
+            end
+
+            local mockNPC = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                initresult = 8,
+                effects = {}
+            })
+            function mockNPC.getPath() return "combattracker.list.id-00002" end
+
+            local fRealGetCTNode = ActorManager.getCTNode
+            ActorManager.getCTNode = function(s) return mockNPC end
+
+            local fRealActive = CombatManager.getActiveCT
+            CombatManager.getActiveCT = function() return mockNPC end
+
+            OptionsManager_mock_options["STEALTHTRACKER_ALLOW_OUT_OF"] = "off"
+            OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "all"
+
+            local fSkillHandler = ActionsManager.getResultHandler("skill")
+            local rRoll = {
+                sType = "skill",
+                sDesc = "[SKILL] Stealth [MOD:3]",
+                aDice = { { type = "d20", result = 11 } },
+                nMod = 3
+            }
+            local rSource = { sCTNode = "combattracker.list.id-00002" }
+
+            fSkillHandler(rSource, nil, rRoll)
+
+            EffectManager.addEffect = fRealAddEffect
+            ActorManager.getCTNode = fRealGetCTNode
+            CombatManager.getActiveCT = fRealActive
+
+            return lastEffectAdded ~= nil
+               and lastEffectAdded.sName == "Stealth: 14"
+               and lastEffectAdded.nGMOnly == 1
+        `
+    );
+
+    await runAssert(
+        "ct-hidden-actor-stealth-roll-flagged-secret",
+        true,
+        `
+            local mockNPC = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                initresult = 8,
+                effects = {}
+            })
+            function mockNPC.getPath() return "combattracker.list.id-00002" end
+
+            local fRealGetCTNode = ActorManager.getCTNode
+            ActorManager.getCTNode = function(s) return mockNPC end
+
+            local fRealIsCTHidden = CombatManager.isCTHidden
+            CombatManager.isCTHidden = function(node) return true end
+
+            local fSkillHandler = ActionsManager.getResultHandler("skill")
+            local rRoll = {
+                sType = "skill",
+                sDesc = "[SKILL] Stealth",
+                aDice = { { type = "d20", result = 10 } },
+                nMod = 2
+            }
+            local rSource = { sCTNode = "combattracker.list.id-00002" }
+
+            fSkillHandler(rSource, nil, rRoll)
+
+            ActorManager.getCTNode = fRealGetCTNode
+            CombatManager.isCTHidden = fRealIsCTHidden
+
+            return rRoll.bSecret == true
+        `
+    );
+
+    await runAssert(
+        "ensureStealthSkillExistsOnNpc-adds-stealth-when-missing",
+        "Stealth +2",
+        `
+            local mockNPC = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                abilities = { dexterity = { bonus = 2 } },
+                skills = ""
+            })
+            ensureStealthSkillExistsOnNpc(mockNPC)
+            return DB.getValue(mockNPC, "skills", "")
+        `
+    );
+
+    await runAssert(
+        "ensureStealthSkillExistsOnNpc-prepends-to-existing-skills",
+        "Stealth +2, Perception +4",
+        `
+            local mockNPC = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                abilities = { dexterity = { bonus = 2 } },
+                skills = "Perception +4"
+            })
+            ensureStealthSkillExistsOnNpc(mockNPC)
+            return DB.getValue(mockNPC, "skills", "")
+        `
+    );
+
+    await runAssert(
+        "ensureStealthSkillExistsOnNpc-preserves-existing-stealth",
+        "Stealth +5, Perception +4",
+        `
+            local mockNPC = createMockNode({
+                recordType = "npc",
+                faction = "foe",
+                abilities = { dexterity = { bonus = 2 } },
+                skills = "Stealth +5, Perception +4"
+            })
+            ensureStealthSkillExistsOnNpc(mockNPC)
+            return DB.getValue(mockNPC, "skills", "")
         `
     );
 
