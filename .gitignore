@@ -1,6 +1,5 @@
 .gitattributes
-.vs/slnx.sqlite
-.vs/VSWorkspaceState.json
+.vs/
 .vscode/settings.json
 scripts/.luacheckrc
 build/out/StealthTracker.zip
