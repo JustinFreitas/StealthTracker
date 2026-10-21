@@ -1,86 +1,206 @@
-# StealthTracker
+# StealthTracker for D&D 5E (Fantasy Grounds Unity & Classic)
 
-https://github.com/JustinFreitas/StealthTracker
+[![GitHub](https://img.shields.io/badge/GitHub-JustinFreitas%2FStealthTracker-blue.svg)](https://github.com/JustinFreitas/StealthTracker)
 
+**StealthTracker** is a Fantasy Grounds extension for the **D&D 5E** ruleset that automates stealth tracking in combat and resolves contested Stealth rolls against Passive Perception in real time.
 
-StealthTracker v5.8 by Justin Freitas
+When an actor rolls Stealth, the total result is automatically tracked as a Combat Tracker (CT) effect (`Stealth: [Total]`). The extension monitors observer Passive Perception scores, evaluates who can perceive or is hidden from whom, provides real-time notifications to the GM in chat, and evaluates advantage on attacks made from stealth.
 
-ReadMe and Usage Notes
+---
 
-StealthTracker is a Fantasy Grounds (Classic or Unity) v3.3.15+, 5e ruleset based extension that tracks PC and NPC stealth rolls in combat and provides various notifications to the GM as to how the current Combat Tracker actor's stealth score compares to the passive perception of other actors, and also, if the current actor can see others that are hiding/stealthing.  This works by comparing the Passive Perception of the current actor (character sheet for PC, CT sheet for NPC) against any tracked stealth roll value for the other CT actors.  The stealth roll value for the various CT actors is tracked as an effect on the CT actor with the syntax "Stealth: #".  If an NPC sheet doesn't have the "senses" sheet entry with an embedded "passive Perception #" value (case sensitive), then the value will be computed as 10 + wisdom bonus.  If the NPC sheet is lacking a Stealth skill to roll, it will be added as "Stealth +0" line in their skills section of the sheet (on the Combat Tracker node only, not main NPC sheet). For a PC sheet, the passive perception is taken from the field, which always has a value. When an observer's Passive Perception is modified by effects on the hiding actor (such as "Cloak of Elvenkind", which imposes a -5 PP penalty on observers per 5e rules for disadvantage on sight-based perception) or other modifiers, chat messages display the effective score and calculation breakdown, e.g. "PP: 10 [15 - 5]". Currently, "Cloak of Elvenkind" is the only supported effect for modifying observer Passive Perception, though support for additional effects may be extended in the future.
+## Key Features
 
-When a Stealth skill roll is rolled on an actors turn in combat, the stealth roll will automatically be added to the effects of that Combat Tracker actor.  This only happens when combat is active (there is an active actor in the CT).  Also, players are restricted from the effects update when it's not their turn in combat (DM can always drag their roll to their CT entry to process the Stealth value).  When a Stealth effect is added to a CT actor, it's now added with no duration and will be expired (configurable option) by actions like an attack, a cast, a cast save, spell attack, etc.  When the initiative is cleared (via the Combat Tracker menu), all stealth data will be removed from the CT actor names automatically (same functionality as '/stealth clear' chat command). At any time, the manual approach of editing combat tracker effects will still work for updates.
+1. **Automated Stealth Tracking**:
+   * Rolling a **Stealth** check automatically records the result as a Combat Tracker effect: `Stealth: [Total]`.
+   * Can be configured to track on the actor's turn, out of turn, or out of combat.
 
-For StealthTracker to work properly, proper Fantasy Grounds use is required.  For example, at the end of combat, clear the initiative via the Combat Tracker menu.  That way, all CT actors will get scrubbed of StealthTracker data.  It prepares the system for next encounter also by firing the TurnStart event when you press the Next Actor button in the Combat Tracker to begin the encounter.  Simply placing the initiative pointer on an actor in the Combat Tracker will not fire the necessary events for StealthTracker to work properly.  In this case, you can force the check telling who is hidden from the current actor ("does not perceive") by using the chat command "/stealth".  The st command will also show what targets are unaware of the current actor (potentially allowing for Advantage on an attack roll).  Any Stealth roll for a non-visible npc current actor in the CT will automatically be made in the tower so that it's not clear what's going on with the hidden actor, even if the setting to show DM rolls is on.
+2. **Contested Stealth vs. Passive Perception**:
+   * Evaluates the active actor's stealth roll against the **Passive Perception** of other combatants in the Combat Tracker.
+   * PC Passive Perception is read directly from the character sheet.
+   * NPC Passive Perception is parsed from their `senses` field (e.g. `passive Perception 14`). If senses are missing, it accurately computes `10 + Wisdom modifier` (plus proficiency bonus when applicable per 5E RAW).
+   * Fully accounts for advantage or disadvantage (+5 / -5) on Passive Perception, including 2014 Exhaustion penalties.
 
-The host/DM can issue a "/stealth clear" command to reset all of the actors in the CT.
+3. **Turn-Start Awareness Summaries**:
+   * Advancing the turn in the Combat Tracker (via the Next Actor button or clicking the active turn indicator) automatically evaluates which hiding actors the current combatant can perceive and which ones remain hidden.
 
-Known Limitations:
-- In a multi-target attack from stealth (like maybe a twinned spell attack from a sorcerer or something similar), only the first roll is accounted for in the analysis.
-- When StealthTracker processes a Hide action from the Generic Actions extension, the effect is assigned before the roll output is displayed.  With a normal Stealth roll, the effect is assigned afterwards.  Not an issue but a difference worth noting.
+4. **Attack from Stealth & Advantage Evaluation**:
+   * When an actor attacks from stealth, StealthTracker evaluates whether the target perceives them.
+   * If the attacker is unseen by the target, the GM is notified in chat that the attacker was hidden and qualifies for advantage on the attack roll per 5E rules.
 
-Future Enhancements:
-- Consider removing or making optional the restriction that a player can only update the PC or NPC they are controlling when it's that actor's turn in the CT.
-- Incorporate light/distance (FGU only)
-- Expand supported stealth effect modifiers beyond Cloak of Elvenkind
+5. **Automated Stealth Expiration**:
+   * Performing an attack (melee, ranged, or spell attack) or completing a combat round automatically expires the actor's `Stealth` effect (configurable via GM options).
 
-Changelist:
-- v1.1 - The main purpose of the new version is to incorporate a chat command that displays all of the visible actors in the battle and WHO THEY CAN'T PERCEIVE.
-- v1.2 - Added auto application of stealth rolls to the Character/CT sheet names, support for npc sheets shared to players, clearing of StealthTracker data (via clearing initiative in CT or by '/stealth clear'), fixes for all of the hidden actor scenarios where chat messages are secret when a hidden npc is involved, many general fixes and performance improvements.
-- v1.2.1 - Bugfix for the substring search looking for the stealth roll.
-- v1.3 - Added the ability to drag stealth rolls from the chat to a CT actor for name update with stealth value from roll.  This works only for host/DM and it can be dropped on any character (no name validation). Added checks on attack to see if the attacker can see the target (is attack even possible?) and to see if the target can see the attacker (ADVATK).
-- v2.0 - This was a major change to move from tracking stealth in the actor's name to tracking stealth in the actor's effects list.  This helped to eliminate several limitations that were a side effect of overloading the actor name field.
-- v2.1 - Update to account for 3.3.13.
-- v2.2 - Deprecation updates.  Addition of current CT actor name to the 'not stealthing' message for clarity. Update to account for 3.3.14.
-- v2.3 - Bug fixes and protection from null pointer exceptions.
-- v2.4 - Change to the action handler override mechanism to chain in the override instead of always calling the base.  This should work around the compatibility issues with other extensions.
-- v2.5 - Extension name change to comply to standard convention, change load order to 999, do not assess stealth attack if target is hidden.
-- v2.6 - Make the Stealth effect hidden for non friendly npcs.  No duration on stealth effects, per rules... it should last until something stops it. NPE protections from manager calls.  Comment cleanup.  Refactor common logic.
-- v2.7 - Expire stealth in more places now that it doesn't have a duration.  This includes spell casts, spell attacks, spell saves, power saves from the actions tab.  I wired a new handler for this: onCastSave.  Stealth processing only occurs for spell attack rolls.  Fixed an NPC passive perception leak to the players when attacking from stealth without advantage, now the message is local to GM only.  Change to have GM own all effects on CT nodes so that users can't change their attributes (like make it inactive).  Report to the GM only that an attack was made from stealth even if the target sees the attacker (previously a no op).
-- v2.8 - Added an option to allow for broadcast of some StealthTracker info to clients, but it defaults to Off.  It does leak passive perception of monsters which is why it defaults to off.   No more user chat commands, only DM.  Some minor refactoring for cleanliness. Fixed several bugs in the code for expiration of Stealth effect by having all Stealth processing occur on the host only.  The clients will only sent an OOB message when they need processing.  Added an option to expire the Stealth effect with a duration (it's a duration of 2 with the effect init set to tick on current - .1) which defaults to On.
-- v2.9 - When the CT is advanced to the turn of a NPC, if the NPC doesn't already have Stealth in its Skills section, it will be added with a zero modifier so that it is easy to stealth with the NPC on its turn.
-- v2.9.1 - Bug fix for error when there is no Skills node on the NPC sheet.
-- v3.0 - This new version supports completely hiding all StealthTracker information (StealthTracker chat messages & StealthTracker effect display) from players.  This way, tables that keep all stealth values hidden won't leak any of the information to the players.  See the new 'Player: Show Stealth info' option in the settings, it's tri-state now (was the old broadcast flag).  Now filters out CT nodes that don't have a type set (often used by DMs for a quick CT entry for a trap or something).  Many refactors for correctness and optimization.  Special thanks to Raddu for the suggestions!
-- v3.1 - Migration to FGU conventions (i.e. launch message to announcement text, etc).  Changed the chat command(s) from 'st' or 'stealthtracker' to only 'stealth' due to conflicts between 'st' and 'story' in FGU.
-- v3.2 - In any NPC CT actor sheet that is modified to have a Stealth skill, it now accounts for the NPC's dexterity modifier (thanks Ludd_G for the suggestion).  Expanded the Stealth effect expiration options (from on/off) to be None, Action, Action and Round (thanks Ludd_G for the suggestion).
-- v3.2.1 - Fix and protection against null pointer exception reported by UnlivingLuke.
-- v3.2.2 - Fix to account for all dice in the stealth skill roll when computing total for effect.
-- v3.2.3 - Improve dice check in skill handler by using common code.
-- v3.3 - Use looked up, translated strings for 'Stealth' and 'Dexterity' so that the StealthTracker functionality will work for localized rulesets.  Thanks to shoebill for the suggestion.
-- v3.4 - Added support for the Generic Action extension Hide action to be processed like Stealth rolls are.  Thanks to BushViper and plap3014 for the suggestion and SilentRuin for support.
-- v3.4.1 - Decode adv/disadv in the post roll handler for the Generic Actions extension compatibility before using the roll total to assign a Stealth effect.  Special thanks to Ludd_G for the bug report.
-- v3.4.2 - Account for a change in FG CT onAdd handler behavior and don't assign the NPC sheet Stealth skill at that time due to uninitialized attributes.  Do it onTurnStart instead where the attributes are correct until the issue with FG is resolved.  Thanks again to Ludd_G for the report.
-- v3.4.3 - Various refactoring and improvement in the code, such as utilization of common FG functions to accomplish tasks instead of homegrown logic.
-- v3.4.4 - Fix for camel cased typo in gmatch function call.  Thanks to carrierpl for the report.
-- v3.4.5 - gmatch was a mistake entirely, revert to gsub
-- v3.5 - Bug fix for incorrect stat reporting in attack from stealth scenario.  Don't process stealth on debilitated actors or actors of the same faction as the one being analyzed (unless Faction Filter option is set to off).  Massive reduction in chat verbosity. New option for verbose output that's mostly for clarifying information when no output is actually necessary (defaults to off). Thanks to Ludd_G for the suggestions and inspiration.  Wiring of castsave through the messaging mechanism and refactor attack and castsave to reduce duplication.  Only one StealthTracker chat entry per roll or turn or command, this required some rework on how things are displayed in chat.  Everything is done host side now except for tower checks.  New option to allow for out of turn or out of combat stealth tracking and functionality (defaults to off/none).
-- v3.6 - Changed the existing Verbosity option to allow for disabling StealthTracker chat output.  Just set it to 'off'.  Standard is the default and has normal StealthTracker output.  Max has all Standard output, plus some additional.  Thanks to MrDDT for the suggestion.
-- v3.6.1 - I ripped out the expiration of stealth on cast.  Spell casts that have attack rolls will still work as those are attacks already.  Any spell that is a save could be argued either way so I'll leave expiration in those cases up to the DM.
-- v3.6.2 - Fix for the broadcast from client to server with unrecognized message error.
-- v3.6.3 - Minor fixes, including announce text shortening.  onDrop override instead of onCustomDrop with fix for FGC double fire.
-- v3.6.4 - Adjustments to account for new FGU CT drop mechanism.  Changes to the FG version check.
-- v3.7 - Added in a user request (special thanks to Tooting Dog) to show aware actors along with hidden and unaware when doing the check against an actors stealth (like in the summary on turn start).  Through this, I've rewritten that portion of the code to be more optimal.  There is an option to tune the stealth summary for aware/unaware/both, defaulting to both.  Fixed a bunch of minor issues.  I've added prof bonus that was missing from the rare default PP calculation (when it's not available to grab from sheet).
-- v3.8 - Much like the new option for v3.7, this 3.8 version adds verbosity option around what the current actor sees.  Historically, only hidden actors were reported in this summary.  Now, it collects CT actors that are visible to the current actor also.  Thew new option is for 'Chat: Source stealth summary verbosity' and can be None, Visible, Hidden, Both.  Also, I added an option to disable/enable the clearing of the Stealth effects on Initiative Clear.  Thanks to Tooting Dog for the suggestions!
-- v3.9 - When a character's display name is blank, use (unidentified) instead when outputting stealth information to chat.  Fixed a bug with the 'Sees Actor' option where only 'None' was working (and it was working as 'Both').  Now, all of the options work correctly for 'Sees Actor'.  Thanks for that bug report, Xerophilex.  There is a new option to 'Chat: Show summary after stealth' which will show the summary information in the chat (according to the options set for StealthTracker) after an actor rolls stealth... another great suggestion by Xerophilex.
-- v3.10 - Changed the in-combat firing of the stealth functionality fromn onTurnStart to requestActivation.  Now, it works when you click the left CT bar to activate an actor that way (and still works when using the Next Actor button too).  I'll be applying this change to all of my Tracker extensions.  Updated the option names to be more understandable and have correct casing.  Updated the unidentified creature name usage to be correct if an NPC is unidentified.  It will now use the unidentified name in that case so chat matches CT name, reducing confusion.
-- v3.11 - Add Passive Perception greater than zero to the valid actor check.  Fixed a bug with the proficiency bonus of NPCs being incorrect in fractional cases and probably other cases also.
-- v3.12 - Update the status text for clarity.  Icon update using Sir Motte's template.
-- v3.13 - No secret eye icon in chat messages, it takes too much space.  Change to the build script.  Later loading sequence to ensure new icon.
-- v3.14 - Another icon update, 42px this time.
-- v3.15 - Move the Options to be GM only to not clutter the player settings since they can't change anything anyway.  Add in any advantage and/or disadvantage in perception, wisdom, or ability adjustments to the passive perception (unaccounted for in the number already) used when detecting hiding actors.
-- v3.16 - Add an option for Frame Style (defaulting to None) to frame the StealthTracker chat output.  The options are None, Chat, Story, Whisper and they utilize the CoreRPG output modes for these selections.  Chat and Story look similar, but story is a tiny bit wider.  Whisper has the most unique look and is very obvious in the chat.
-- v3.17 - Chat frame adjustments and a bugfix calling EffectManager5E.hasEffectCondition() which indirectly has a condition that can expire effects.  I replaced those with calls to EffectManager.hasEffect() instead, which doesn't have that side effect.
-- v3.18 - Add an option to show the hidden (eye) icon in secret chat messages.
-- v3.19 - When stealth effects are cleared from a chat command, always force the removal instead of considering the 'out of turn or combat stealth' option (which is still considered on combat initiative reset).
-- v3.20 - Support for 'Cloak of Elvenkind' effect on an actor (-5 Passive Perception penalty to observers detecting the wearer).
-- v5.3 - Correctness fixes: default passive Perception fallback no longer unconditionally adds the proficiency bonus (now 10 + Wisdom mod per 5e RAW, so non-proficient creatures are no longer over-detected); hardened booleanToNumber against non-boolean input; guarded the aware/unaware summary against a nil source stealth value; use the resolved actor for the source display name for consistency; use isOption() for the faction filter check.
-- v5.4 - FGC compatibility fix: onInit no longer crashes on Fantasy Grounds Classic.  ActionsManager.getResultHandler() is an FGU-only method, so capturing the ruleset's existing skill/attack result handlers for passthrough failed with a nil value error on classic.  Added a getResultHandlerSafe() helper that uses getResultHandler() when present (FGU, unchanged) and otherwise falls back to the internal ActionsManager handler table on FGC.
-- v5.5 - FGU-only modernization: Refactored codebase to be FGU-only. Added support for duplicate actor matching (turn check redirection, name-based NPC/PC targeting, and drag-and-drop targeting fallback). Fixed parsing/expiration of GM-only parenthesized Stealth effects (e.g. '(Stealth: 55)') on NPC attacks.
-- v5.6 - Stealth effect privacy fix: Fixed issue where Stealth effects remained visible to players on Combat Tracker when 'Player: Show Stealth info' option was set to None. Explicitly set isgmonly flag on created effect database nodes for GM-only stealth effects and suppressed chat announcements when player stealth info is disabled.
-- v5.7 - Generic Actions Hide fix: Avoid redundant advantage/disadvantage decoding in StealthTracker when Generic Actions or the ruleset has already decoded the roll, preventing duplicated '[ADV] [DROPPED ...]' chat output.
-- v5.7.1 - Console cleanup: Clean up verbose debug trace console statements across attack rolls, skill rolls, duplicate actor resolution, and turn checks.
-- v5.7.2 - Fix CT stealth effect and chat notifications: Restored roll resolution hooking via ActionsManager result handlers, ensuring skill and attack observers trigger reliably after ruleset processing. Fixed database node path resolution in turn and combat checks (handling userdata databasenodes in FGU) so rolls during an actor's turn properly apply the Stealth effect to the Combat Tracker and trigger awareness notifications. Also modernized CombatDropManager registration, standardized on DB package functions (DB.deleteNode, DB.getValue/setValue), and enforced strict Lua nil semantics.
-- v5.7.3 - Fantasy Grounds Classic (FGC) compatibility: Restored full dual FGC/FGU compatibility. In FGC, ActionsManager.getResultHandler is absent and its internal handler table is scoped locally, so getResultHandlerSafe now properly falls back to the ruleset's ActionSkill.onRoll and ActionAttack.onAttack handlers, fixing an issue where skill and attack roll resolutions were completely suppressed on FGC. Fixed getActorSafe on FGC where calling legacy 2-argument ActorManager.getActor returned nil, restoring CT turn activation Stealth analysis vs PP, NPC Stealth skill auto-population, and attack from stealth handling. Fixed attack from stealth advantage analysis where attacking a non-hiding target suppressed chat messages due to an erroneous target-stealth check in getFormattedPerformAttackFromStealth. Hardened actor and CT node path resolution in attack handlers, guarded CombatManager.requestActivation against recursion on reload, restored checkFGC() runtime detection, FGC CT onDrop event deduplication, and 2014 Exhaustion disadvantage in Passive Perception calculations.
-- v5.8 - Dice Tower & client privacy fixes, Cloak of Elvenkind restoration, and polish: Stealth rolls made in the Dice Tower or secretly (rRoll.bSecret / rRoll.bTower, or secret chat rolls dragged onto the CT) now automatically apply their 'Stealth: X' effect as GM-only on the Combat Tracker and suppress public chat announcements even when 'Player: Show Stealth info' is set to Effects or Chat and Effects. Hooked CombatDropManager.handleAnyDrop directly to ensure chat roll total drags reliably update CT stealth effects across modern CoreRPG. Fixed client-side option lookup in isPlayerStealthInfoDisabled() by reading 'options.STEALTHTRACKER_VISIBILITY' directly from the database as a fallback, and hooked ActionsManager.performAction so Stealth rolls are marked secret before dice are thrown when visibility is None or the actor is hidden. Restored STEALTH_EFFECT_MODIFIERS ('Cloak of Elvenkind' -5 observer Passive Perception penalty) and updated chat formatting to display the calculation breakdown for modified Passive Perception (e.g. 'PP: 10 [15 - 5]'). Fixed 'Chat: Show summary after stealth' when players roll Stealth via OOB. Centralized getActorDisplayNameSafe() across all chat messages to prevent leaking true names of unidentified NPCs. Made NPC Stealth skill detection case-insensitive with flexible whitespace.
+6. **NPC Stealth Skill Generation**:
+   * When an NPC without a configured Stealth skill is added to or activated in the Combat Tracker, StealthTracker automatically adds `Stealth +[DEX mod]` to their CT skills list, allowing the GM to roll stealth with a single click.
 
-![alt text](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
+7. **Dice Tower & Secret Roll Privacy**:
+   * Stealth rolls dropped into the Dice Tower or flagged secret (`[TOWER]`, `[GM]`) automatically create GM-only Combat Tracker effects (`isgmonly = 1`) and suppress public announcements, keeping stealth results confidential even if player visibility options are turned on.
+
+8. **Stealth Effect Modifiers (Cloak of Elvenkind)**:
+   * Supports stealth-modifying items and effects such as the **Cloak of Elvenkind** (which imposes disadvantage / a -5 penalty to observer sight-based Passive Perception).
+   * Chat messages display the effective score and calculation breakdown (e.g. `PP: 10 [15 - 5]`).
+
+9. **Chat Roll Drag-and-Drop**:
+   * The GM can drag any stealth roll total from the chat log and drop it directly onto an actor in the Combat Tracker to assign or override their stealth value.
+
+---
+
+## Chat Commands
+
+| Command | Description |
+| :--- | :--- |
+| `/stealth` | Runs an immediate awareness evaluation for the active combatant, reporting who they can and cannot perceive. |
+| `/stealth clear` | Immediately removes all `Stealth: #` effects from all actors across the Combat Tracker. |
+
+---
+
+## Configuration Settings (GM Options)
+
+StealthTracker options can be found in Fantasy Grounds under the **Options** window in the **StealthTracker (GM)** section:
+
+* **Player: Out of turn or combat Stealth** (`STEALTHTRACKER_ALLOW_OUT_OF`)
+  * *None (Default)*: Stealth tracking only triggers during combat on the actor's active turn.
+  * *Turn*: Allows stealth tracking out of combat when it is the actor's turn.
+  * *Turn and Combat*: Allows stealth tracking out of turn and out of combat.
+
+* **CT: Expire Stealth effect** (`STEALTHTRACKER_EXPIRE_EFFECT`)
+  * *Attack and Round (Default)*: Automatically expires the `Stealth` effect when making an attack or at the end of the round.
+  * *Attack*: Expires stealth only upon making an attack roll.
+  * *None*: Stealth effects persist until manually cleared.
+
+* **CT: Ignore Stealth same faction** (`STEALTHTRACKER_FACTION_FILTER`)
+  * *On (Default)*: Allies within the same faction ignore stealth checks against one another (e.g. PCs do not hide from fellow party members).
+  * *Off*: Evaluates stealth against every actor in the Combat Tracker regardless of faction.
+
+* **Player: Show Stealth info** (`STEALTHTRACKER_VISIBILITY`)
+  * *Effects (Default)*: Displays `Stealth: [Total]` effects to players on the Combat Tracker (unless rolled secretly).
+  * *Chat and Effects*: Displays both chat summary announcements and Combat Tracker effects to players.
+  * *None*: Hides all stealth effects and chat output from players (effects are marked GM-only).
+
+* **Chat: General verbosity** (`STEALTHTRACKER_VERBOSE`)
+  * *Standard (Default)*: Standard reporting of hidden and spotted statuses.
+  * *Max*: Verbose output with additional situational details (such as notifications when a target spots an ambush).
+  * *Off*: Silences general StealthTracker chat reporting.
+
+* **Chat: 'Sees Actor' verbosity** (`STEALTHTRACKER_AWARE`)
+  * *Both (Default)*: Reports both observers who spot the hiding actor and observers who fail to perceive them.
+  * *Aware*: Only reports observers who successfully perceive the hiding actor.
+  * *Unaware*: Only reports observers who fail to perceive the hiding actor.
+  * *None*: Suppresses the 'Sees Actor' summary.
+
+* **Chat: 'Actor Sees' verbosity** (`STEALTHTRACKER_VISIBLE`)
+  * *Hidden (Default)*: Reports only hidden opponents that the active actor cannot perceive.
+  * *Visible*: Reports opponents that the active actor can perceive.
+  * *Both*: Reports both visible and hidden opponents.
+  * *None*: Suppresses the 'Actor Sees' summary.
+
+* **CT: Remove Stealth on Init Clear** (`STEALTHTRACKER_INIT_CLEAR`)
+  * *On (Default)*: Automatically cleans up all `Stealth` effects from the Combat Tracker when clearing initiative via the CT menu.
+  * *Off*: Retains stealth effects when initiative is cleared.
+
+* **Chat: Show summary after Stealth** (`STEALTHTRACKER_SHOW_AFTER_STEALTH`)
+  * *On (Default)*: Posts the awareness summary to GM chat immediately after an actor rolls Stealth.
+  * *Off*: Awareness summary only fires upon turn activation or manual command.
+
+* **Chat: Frame style** (`STEALTHTRACKER_FRAME_STYLE`)
+  * *None (Default)*: Unbordered text formatting.
+  * *Chat / Story / Whisper*: Styles StealthTracker announcements with native CoreRPG box frames.
+
+* **Chat: Show Hidden (eye) Icon** (`STEALTHTRACKER_SHOW_EYE`)
+  * *Off (Default)*: Omits the eye icon on secret messages to conserve chat space.
+  * *On*: Displays the secret eye icon next to GM-only chat messages.
+
+---
+
+## Best Practices & Tips
+
+* **Clearing Initiative at Encounter End**: At the end of combat, clear the initiative via the Combat Tracker menu (**Menu** &rarr; **Clear Initiative**) or execute `/stealth clear`. This cleans up stealth data and ensures fresh TurnStart events when the next encounter begins.
+* **Advancing Combat**: To start an encounter and cycle turns, use the **Next Actor** button or click directly on an actor's turn indicator in the Combat Tracker. Simply moving the round marker will not fire activation hooks.
+* **Unidentified NPCs**: StealthTracker fully respects the unidentified state of creatures on the Combat Tracker. Monster names in chat output appear as `(unidentified)` or their assigned unidentified label, ensuring no player spoilers.
+* **Generic Actions Extension**: StealthTracker automatically intercepts and processes **Hide** actions rolled from the *Generic Actions* extension.
+
+---
+
+## Installation
+
+> **Compatibility**: Designed for **Fantasy Grounds Unity (FGU)** and **Fantasy Grounds Classic (FGC)** v3.3.15+ under the **D&D 5E** ruleset.
+
+### Recommended: Fantasy Grounds Forge
+
+Install directly via the [Fantasy Grounds Forge](https://forge.fantasygrounds.com/). Forge handles installation and provides seamless automatic updates whenever a new version is released.
+
+### Manual / Developer Build
+
+1. Download or package the repository into `StealthTracker.ext` using `build/package.ps1` or your preferred zip tool (store as a `.zip` without top-level folder wrapping, then rename extension to `.ext`).
+2. Copy `StealthTracker.ext` into your Fantasy Grounds `extensions` directory:
+   * Windows: `%APPDATA%\SmiteWorks\Fantasy Grounds\extensions\`
+3. Enable **Feature: StealthTracker** in the Extensions list when loading your 5E campaign.
+
+---
+
+## Changelog
+
+### v5.8
+* **Dice Tower & Secret Roll Privacy**: Stealth rolls made in the Dice Tower or secretly (`rRoll.bSecret` / `rRoll.bTower`, or secret chat rolls dragged onto the CT) now automatically mark the resulting `Stealth: X` effect as GM-only (`isgmonly = 1`) and suppress public chat announcements even when `Player: Show Stealth info` is set to `Effects` or `Chat and Effects`.
+* **Client-Side Option Lookup & Roll Pre-Hook**: Fixed `isPlayerStealthInfoDisabled()` on player clients by falling back to `DB.getValue("options.STEALTHTRACKER_VISIBILITY", "")`, and hooked `ActionsManager.performAction` so Stealth rolls are marked secret before dice are thrown when visibility is `None` or the actor is hidden.
+* **Combat Tracker Chat-Roll Drag-and-Drop**: Hooked `CombatDropManager.handleAnyDrop` directly in `onInit()` to ensure chat roll total drags reliably update CT stealth effects across modern CoreRPG.
+* **Cloak of Elvenkind Restoration**: Restored `STEALTH_EFFECT_MODIFIERS` (-5 observer Passive Perception penalty) and updated chat output to display the calculation breakdown for modified Passive Perception (e.g. `PP: 10 [15 - 5]`).
+* **Unidentified NPC Name Protection**: Centralized `getActorDisplayNameSafe()` across all chat messages to prevent leaking the true identity of unidentified NPCs.
+* **NPC Skill Detection**: Made NPC Stealth skill detection case-insensitive with flexible whitespace.
+
+### v5.7.3
+* **Fantasy Grounds Classic (FGC) Compatibility**: Restored full dual FGC/FGU compatibility. Captures `ActionSkill.onRoll` and `ActionAttack.onAttack` when `ActionsManager.getResultHandler` is absent in FGC.
+* **Safe Actor Resolution**: Fixed `getActorSafe` on FGC by resolving via `ActorManager.resolveActor`, restoring turn activation analysis and NPC skill population.
+* **Attack from Stealth Fix**: Fixed attack advantage evaluation when attacking a non-hiding target.
+* **Exhaustion Disadvantage in PP**: Restored 2014 Exhaustion disadvantage in Passive Perception calculations.
+
+### v5.7.2
+* **Action Resolution Modernization**: Restored roll resolution hooking via `ActionsManager` result handlers to ensure skill and attack observers trigger reliably after ruleset processing.
+* **Node Path Resolution**: Fixed database node path resolution for userdata `databasenode` references in FGU.
+* **Drop & DB API Standards**: Standardized on modern `CombatDropManager` registration and direct `DB` package functions (`DB.deleteNode`, `DB.getValue`, `DB.setValue`).
+
+### v5.7.1
+* Cleaned up verbose debug trace console logging across attack rolls, skill rolls, duplicate actor resolution, and turn checks.
+
+### v5.7
+* Fixed double-decoding on Generic Actions Hide rolls by skipping redundant advantage/disadvantage decoding when already handled by the ruleset.
+
+### v5.6
+* Fixed issue where Stealth effects remained visible to players on the Combat Tracker when `Player: Show Stealth info` was set to `None`. Explicitly set `isgmonly = 1` on created effect nodes.
+
+### v5.5
+* Added duplicate actor matching (turn check redirection, name-based NPC/PC targeting, and drag-and-drop fallback).
+* Added parsing/expiration of GM-only parenthesized stealth effects (e.g. `(Stealth: 18)`) on NPC attacks.
+
+### v5.4
+* Added `getResultHandlerSafe` helper to guard against FGC nil errors with `ActionsManager.getResultHandler`.
+
+### v5.3
+* Corrected default Passive Perception fallback to `10 + Wisdom modifier` (RAW) rather than unconditionally adding proficiency bonus.
+* Hardened `booleanToNumber` and guarded aware/unaware summaries against nil values.
+
+### v3.7 – v3.20
+* **v3.20**: Added support for **Cloak of Elvenkind** (-5 PP penalty to observers).
+* **v3.19**: Forced removal of stealth effects when triggered from chat commands.
+* **v3.18**: Added option to display the Hidden (eye) icon on secret chat messages.
+* **v3.17**: Chat frame adjustments and replaced condition checks with safe `EffectManager.hasEffect` calls.
+* **v3.16**: Added `Chat: Frame style` option (None, Chat, Story, Whisper).
+* **v3.15**: Restricted options to GM window and accounted for advantage/disadvantage in Passive Perception.
+* **v3.12 – v3.14**: Icon modernizations and chat announcement formatting.
+* **v3.10 – v3.11**: Triggered combat stealth checks on `requestActivation`, added unidentified creature name handling, and fixed NPC proficiency bonus fractions.
+* **v3.8 – v3.9**: Added `Chat: 'Actor Sees' verbosity` and `CT: Remove Stealth on Init Clear` options.
+* **v3.7**: Added aware/unaware summary display options.
+
+### v1.1 – v3.6.4
+* **v3.6**: Added verbosity options to tune or disable StealthTracker chat output.
+* **v3.5**: Faction filtering support, massive chat verbosity reduction, and out-of-combat tracking options.
+* **v3.4**: Added support for *Generic Actions* extension Hide actions.
+* **v3.3**: Added localized string lookup support for non-English rulesets.
+* **v3.2**: Added DEX modifier calculation for automatically generated NPC Stealth skills.
+* **v3.0**: Introduced tri-state player visibility options to completely hide stealth info from players.
+* **v2.0 – v2.9**: Migrated stealth tracking from actor names to Combat Tracker effects; automated stealth expiration on attacks; added drag-and-drop roll assignment.
+* **v1.1 – v1.3**: Initial releases introducing `/stealth` chat commands, automatic roll detection, and advantage evaluation.
+
+---
+
+![StealthTracker Screenshot](https://github.com/JustinFreitas/StealthTracker/blob/master/graphics/StealthTrackerScreenshot.png?raw=true)
