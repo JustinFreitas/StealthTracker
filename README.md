@@ -31,7 +31,7 @@ When an actor rolls Stealth, the total result is automatically tracked as a Comb
    * Performing an attack (melee, ranged, or spell attack) or completing a combat round automatically expires the actor's `Stealth` effect (configurable via GM options).
 
 6. **NPC Stealth Skill Generation**:
-   * When an NPC without a configured Stealth skill is added to or activated in the Combat Tracker, StealthTracker automatically adds `Stealth +[DEX mod]` to their CT skills list, allowing the GM to roll stealth with a single click.
+   * When an NPC without a configured Stealth skill is added to the Combat Tracker (individually, via map token drop, or from an Encounter), present in the Combat Tracker on campaign load, or activated on its turn, StealthTracker automatically adds `Stealth +[DEX mod]` to their CT skills list and refreshes any open locked NPC sheet immediately—allowing the GM to roll stealth with a single click. Traps, Objects, and creatures tagged `no stealthtracker` in Senses are automatically skipped.
 
 7. **Dice Tower & Secret Roll Privacy**:
    * Stealth rolls dropped into the Dice Tower or flagged secret (`[TOWER]`, `[GM]`) automatically create GM-only Combat Tracker effects (`isgmonly = 1`) and suppress public announcements, keeping stealth results confidential even if player visibility options are turned on.
@@ -141,8 +141,8 @@ Install directly via the [Fantasy Grounds Forge](https://forge.fantasygrounds.co
 ## Changelog
 
 ### v5.8.1
-* **CoreRPG Initiative Sync Hardening (Nov 2026)**: Added `sInitSource = "turn"` on duration-2 fractional stealth effects during round and action-based expiration checks to maintain full compatibility with CoreRPG `ActorEffectManager.onInitResultUpdate` and prevent ruleset initiative synchronization from resetting fractional sub-turn offsets.
-* **Immediate NPC Stealth Skill Population & Live Sheet Refresh**: Hooked `CombatRecordManager` NPC post-add (with FGC `CombatManager.setCustomAddNPC` parity) and campaign load (`onTabletopInit` / `Interface.onDesktopInit`) so `Stealth +[DEX mod]` is populated as soon as an NPC enters the Combat Tracker rather than waiting for its first turn. Also refreshes already-open locked NPC sheets (including resetting cached multi-roll skill offsets across 2024/2014/FGC layouts) and supports en-dash negative skill modifiers (`Stealth –1`).
+* **CoreRPG Initiative Sync Hardening (Nov 2026)**: Added `sInitSource = "turn"` on duration-2 fractional stealth effects during round and action-based expiration checks (and restored the fractional `init` offset after `EffectManager.addEffect`) to maintain full compatibility with CoreRPG `ActorEffectManager.onInitResultUpdate` and `EffectVarManager.onEffectAddSetupInit`, preventing ruleset initiative synchronization from resetting fractional sub-turn offsets.
+* **Immediate NPC Stealth Skill Population & Live Sheet Refresh**: Hooked `CombatRecordManager` NPC post-add on FGU (with FGC `CombatManager.setCustomAddNPC` parity across single drops and Encounter placements) and campaign load (`onTabletopInit` on FGU / `Interface.onDesktopInit` on FGC) so `Stealth +[DEX mod]` is populated as soon as an NPC enters the Combat Tracker rather than waiting for its first turn. Also refreshes already-open locked NPC sheets (including resetting cached multi-roll skill offsets across 2024, 2014, and FGC layouts), supports en-dash negative skill modifiers (`Stealth –1`), and skips Traps/Objects regardless of faction.
 
 ### v5.8
 * **Dice Tower & Secret Roll Privacy**: Stealth rolls made in the Dice Tower or secretly (`rRoll.bSecret` / `rRoll.bTower`, or secret chat rolls dragged onto the CT) now automatically mark the resulting `Stealth: X` effect as GM-only (`isgmonly = 1`) and suppress public chat announcements even when `Player: Show Stealth info` is set to `Effects` or `Chat and Effects`.
