@@ -140,6 +140,9 @@ Install directly via the [Fantasy Grounds Forge](https://forge.fantasygrounds.co
 
 ## Changelog
 
+### v5.8.1
+* **CoreRPG Initiative Sync Hardening (Nov 2026)**: Added `sInitSource = "turn"` on duration-2 fractional stealth effects during round and action-based expiration checks to maintain full compatibility with CoreRPG `ActorEffectManager.onInitResultUpdate` and prevent ruleset initiative synchronization from resetting fractional sub-turn offsets.
+
 ### v5.8
 * **Dice Tower & Secret Roll Privacy**: Stealth rolls made in the Dice Tower or secretly (`rRoll.bSecret` / `rRoll.bTower`, or secret chat rolls dragged onto the CT) now automatically mark the resulting `Stealth: X` effect as GM-only (`isgmonly = 1`) and suppress public chat announcements even when `Player: Show Stealth info` is set to `Effects` or `Chat and Effects`.
 * **Client-Side Option Lookup & Roll Pre-Hook**: Fixed `isPlayerStealthInfoDisabled()` on player clients by falling back to `DB.getValue("options.STEALTHTRACKER_VISIBILITY", "")`, and hooked `ActionsManager.performAction` so Stealth rolls are marked secret before dice are thrown when visibility is `None` or the actor is hidden.
