@@ -1880,6 +1880,84 @@ async function runTests() {
         `
     );
 
+    await runAssert(
+        "expire-action-and-round-sets-initsource-turn-and-preserves-fractional-init",
+        "",
+        `
+            local failures = {}
+            local function fail(msg) table.insert(failures, msg) end
+
+            local fRealAddEffect = EffectManager.addEffect
+            local fRealGetCTNode = ActorManager.getCTNode
+            local capturedEffect = nil
+            local createdEffectNode = nil
+
+            local mockCT = createMockNode({
+                recordType = "pc",
+                faction = "friend",
+                initresult = 14,
+                effects = {}
+            })
+            ActorManager.getCTNode = function() return mockCT end
+
+            EffectManager.addEffect = function(sUser, sIdentity, nodeCT, rEffect, bShowMsg)
+                capturedEffect = {
+                    sName = rEffect.sName,
+                    nInit = rEffect.nInit,
+                    nDuration = rEffect.nDuration,
+                    sInitSource = rEffect.sInitSource
+                }
+                -- Simulate CoreRPG EffectVarManager.onEffectAddSetupInit overwriting nInit when sInitSource == "turn"
+                local nStoredInit = rEffect.nInit
+                if rEffect.sInitSource == "turn" then
+                    nStoredInit = DB.getValue(nodeCT, "initresult", 0)
+                end
+                local nodeEffects = nodeCT.getChild("effects")
+                createdEffectNode = createMockNode({
+                    label = rEffect.sName,
+                    init = nStoredInit,
+                    initsource = rEffect.sInitSource or "",
+                    duration = rEffect.nDuration
+                })
+                nodeEffects.data["eff1"] = createdEffectNode.data
+                return createdEffectNode
+            end
+
+            -- 1. With STEALTHTRACKER_EXPIRE_EFFECT = "all" (nDuration = 2)
+            OptionsManager_mock_options["STEALTHTRACKER_EXPIRE_EFFECT"] = "all"
+            OptionsManager_mock_options["STEALTHTRACKER_VISIBILITY"] = "all"
+            mockCT.data.effects = {}
+            setNodeWithStealthValue("combattracker.list.id-00060", 17)
+
+            if not capturedEffect or capturedEffect.nDuration ~= 2 then
+                fail("expected nDuration == 2 when expire option is all")
+            end
+            if not capturedEffect or capturedEffect.sInitSource ~= "turn" then
+                fail("expected sInitSource == 'turn' on nDuration == 2 effect")
+            end
+            if not createdEffectNode or math.abs((createdEffectNode.data.init or 0) - 13.9) > 1e-6 then
+                fail("expected fractional init 13.9 preserved after CoreRPG setup, got " .. tostring(createdEffectNode and createdEffectNode.data.init))
+            end
+
+            -- 2. With STEALTHTRACKER_EXPIRE_EFFECT = "off" (nDuration = 0)
+            OptionsManager_mock_options["STEALTHTRACKER_EXPIRE_EFFECT"] = "off"
+            mockCT.data.effects = {}
+            setNodeWithStealthValue("combattracker.list.id-00060", 17)
+
+            if not capturedEffect or capturedEffect.nDuration ~= 0 then
+                fail("expected nDuration == 0 when expire option is off")
+            end
+            if capturedEffect and capturedEffect.sInitSource ~= nil then
+                fail("expected sInitSource == nil when nDuration == 0")
+            end
+
+            EffectManager.addEffect = fRealAddEffect
+            ActorManager.getCTNode = fRealGetCTNode
+
+            return table.concat(failures, "; ")
+        `
+    );
+
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);
     
