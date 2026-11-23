@@ -1958,6 +1958,159 @@ async function runTests() {
         `
     );
 
+    await runAssert(
+        "npc-stealth-auto-populate-on-ct-postadd-tabletopinit-and-open-window-refresh",
+        "",
+        `
+            local failures = {}
+            local function fail(msg) table.insert(failures, msg) end
+
+            -- 1. En-dash, compact, colon, whitespace, Counterstealth, and friendly Trap/Object guards
+            do
+                local n1 = createMockNode({ recordType = "npc", faction = "foe", type = "Humanoid", abilities = { dexterity = { bonus = 1 } }, skills = "Stealth \u20131, Perception +2" })
+                ensureStealthSkillExistsOnNpc(n1)
+                if DB.getValue(n1, "skills", "") ~= "Stealth \u20131, Perception +2" then
+                    fail("en-dash Stealth should be preserved without duplication: " .. tostring(DB.getValue(n1, "skills", "")))
+                end
+
+                local n2 = createMockNode({ recordType = "npc", faction = "foe", type = "Humanoid", abilities = { dexterity = { bonus = 3 } }, skills = "Stealth: +5" })
+                ensureStealthSkillExistsOnNpc(n2)
+                if DB.getValue(n2, "skills", "") ~= "Stealth: +5" then
+                    fail("colon Stealth should be preserved: " .. tostring(DB.getValue(n2, "skills", "")))
+                end
+
+                local n3 = createMockNode({ recordType = "npc", faction = "foe", type = "Humanoid", abilities = { dexterity = { bonus = 2 } }, skills = "Counterstealth +4" })
+                ensureStealthSkillExistsOnNpc(n3)
+                if DB.getValue(n3, "skills", "") ~= "Stealth +2, Counterstealth +4" then
+                    fail("Counterstealth should not block adding Stealth: " .. tostring(DB.getValue(n3, "skills", "")))
+                end
+
+                local nTrap = createMockNode({ recordType = "npc", faction = "friend", type = "Trap", abilities = { dexterity = { bonus = 2 } }, skills = "" })
+                ensureStealthSkillExistsOnNpc(nTrap)
+                if DB.getValue(nTrap, "skills", "") ~= "" then
+                    fail("Friendly Trap should not get Stealth skill")
+                end
+
+                local nBlank = createMockNode({ recordType = "npc", faction = "foe", type = "Beast", abilities = { dexterity = { bonus = -1 } }, skills = "   " })
+                ensureStealthSkillExistsOnNpc(nBlank)
+                if DB.getValue(nBlank, "skills", "") ~= "Stealth -1" then
+                    fail("Whitespace skills should become Stealth -1, got: " .. tostring(DB.getValue(nBlank, "skills", "")))
+                end
+            end
+
+            -- 2. Open NPC window refresh (2024/2014 nested sub_bottom + FGC main_creature)
+            do
+                local fRealFindWindow = Interface.findWindow
+                local bParsedState = true
+                local nBottomUpdates = 0
+                local mockNpcWin = {
+                    main = {
+                        subwindow = {
+                            sub_content = {
+                                subwindow = {
+                                    sub_bottom = {
+                                        subwindow = {
+                                            skills = {
+                                                setParsed = function(b) bParsedState = b end
+                                            },
+                                            update = function() nBottomUpdates = nBottomUpdates + 1 end
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                local targetNode = createMockNode({ recordType = "npc", faction = "foe", type = "Humanoid (orc)", abilities = { dexterity = { bonus = 1 } }, skills = "Intimidation +2" })
+                Interface.findWindow = function(sClass, vPath)
+                    if sClass == "npc" then return mockNpcWin end
+                    return nil
+                end
+
+                ensureStealthSkillExistsOnNpc(targetNode)
+                if DB.getValue(targetNode, "skills", "") ~= "Stealth +1, Intimidation +2" then
+                    fail("Orc skills mismatch: " .. tostring(DB.getValue(targetNode, "skills", "")))
+                end
+                if bParsedState ~= false or nBottomUpdates ~= 1 then
+                    fail("Expected setParsed(false) and sub_bottom.update() once, got parsed=" .. tostring(bParsedState) .. " updates=" .. tostring(nBottomUpdates))
+                end
+
+                -- Second call when Stealth already exists must NOT trigger redundant window updates
+                ensureStealthSkillExistsOnNpc(targetNode)
+                if nBottomUpdates ~= 1 then
+                    fail("Expected no redundant update when Stealth already present")
+                end
+
+                -- Legacy / FGC main_creature layout
+                local nLastCharKey = nil
+                local nLegacyUpdates = 0
+                local mockFgcWin = {
+                    main_creature = {
+                        subwindow = {
+                            skills = {
+                                onChar = function(k) nLastCharKey = k end
+                            },
+                            update = function() nLegacyUpdates = nLegacyUpdates + 1 end
+                        }
+                    }
+                }
+                Interface.findWindow = function(sClass) return sClass == "npc" and mockFgcWin or nil end
+                local fgcNode = createMockNode({ recordType = "npc", faction = "friend", type = "Beast", abilities = { dexterity = { bonus = 1 } }, skills = "" })
+                ensureStealthSkillExistsOnNpc(fgcNode)
+                if nLastCharKey ~= 0 or nLegacyUpdates ~= 1 then
+                    fail("Expected FGC onChar(0) and update(), got key=" .. tostring(nLastCharKey) .. " updates=" .. tostring(nLegacyUpdates))
+                end
+
+                Interface.findWindow = fRealFindWindow
+            end
+
+            -- 3. CombatRecordManager post-add hook & onTabletopInit scan
+            do
+                local bPrevPostAddCalled = false
+                local registeredPostAdd = function(tCustom)
+                    bPrevPostAddCalled = true
+                    -- Simulate CombatManager2 populating DEX bonus before our chained wrapper runs
+                    tCustom.nodeCT.data.abilities = { dexterity = { bonus = 3 } }
+                    return "ok"
+                end
+                CombatRecordManager = {
+                    getRecordTypePostAddCallback = function(sType) return sType == "npc" and registeredPostAdd or nil end,
+                    setRecordTypePostAddCallback = function(sType, fn) if sType == "npc" then registeredPostAdd = fn end end
+                }
+                bStealthTrackerInitialized = false
+                USER_ISHOST = true
+                onInit()
+
+                local addedNpc = createMockNode({ recordType = "npc", faction = "foe", type = "Beast", skills = "" })
+                local retVal = registeredPostAdd({ nodeCT = addedNpc })
+                if not bPrevPostAddCalled or retVal ~= "ok" or DB.getValue(addedNpc, "skills", "") ~= "Stealth +3" then
+                    fail("CombatRecordManager post-add failed to chain and populate Stealth +3, got: " .. tostring(DB.getValue(addedNpc, "skills", "")))
+                end
+
+                -- onTabletopInit populates existing CT NPCs
+                local existingWarhorse = createMockNode({ recordType = "npc", faction = "friend", type = "Beast", abilities = { dexterity = { bonus = 1 } }, skills = "" })
+                local existingTrap = createMockNode({ recordType = "npc", faction = "foe", type = "Trap", abilities = { dexterity = { bonus = 4 } }, skills = "" })
+                local fRealGetCombatants = CombatManager.getCombatantNodes
+                CombatManager.getCombatantNodes = function()
+                    return { w = existingWarhorse, t = existingTrap }
+                end
+                IS_FGC = false
+                onTabletopInit()
+                CombatManager.getCombatantNodes = fRealGetCombatants
+                CombatRecordManager = nil
+
+                if DB.getValue(existingWarhorse, "skills", "") ~= "Stealth +1" then
+                    fail("onTabletopInit failed to populate existing Warhorse")
+                end
+                if DB.getValue(existingTrap, "skills", "") ~= "" then
+                    fail("onTabletopInit should skip Trap")
+                end
+            end
+
+            return table.concat(failures, "; ")
+        `
+    );
+
     // 4. Print Summary
     console.log(`\nTest Summary: ${testsPassed} passed, ${testsFailed} failed.`);
     

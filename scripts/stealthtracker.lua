@@ -59,8 +59,20 @@ local A_SKILL_FILTER = {
 
 aOwnResultWrappers = {}
 local ActionsManager_performAction_Original, CombatManager_onDrop, CombatManager_requestActivation
+local _fNPCPostAddWrapper, _fPrevNPCPostAdd
+local _fCustomAddNPCWrapper, _fPrevCustomAddNPC
+local _fDesktopInitWrapper, _fPrevDesktopInit
 local _bAbilityBonusWarningLogged = false
 bStealthTrackerInitialized = false
+
+-- Helper to safely trim leading/trailing whitespace.
+local function trimSafe(s)
+    if type(s) ~= "string" then return "" end
+    if StringManager and StringManager.trim then
+        return StringManager.trim(s)
+    end
+    return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
 
 -- Helper to safely check if a string is blank, preferring the modern StringManager method.
 local function isBlankSafe(s)
@@ -285,6 +297,61 @@ function onInit()
             CombatManager_requestActivation = CombatManager.requestActivation
             CombatManager.requestActivation = requestActivation
         end
+
+		-- Populate Stealth skill immediately when an NPC is added to the Combat Tracker (after stats/skills are copied).
+		if CombatRecordManager and CombatRecordManager.setRecordTypePostAddCallback then
+			local fCurrent = CombatRecordManager.getRecordTypePostAddCallback and CombatRecordManager.getRecordTypePostAddCallback("npc")
+			if fCurrent ~= _fNPCPostAddWrapper then
+				_fPrevNPCPostAdd = fCurrent
+				_fNPCPostAddWrapper = function(tCustom)
+					local vRet
+					if _fPrevNPCPostAdd then
+						vRet = _fPrevNPCPostAdd(tCustom)
+					end
+					if tCustom and tCustom.nodeCT and isValidCTNode(tCustom.nodeCT) then
+						local bOk, sErr = pcall(ensureStealthSkillExistsOnNpc, tCustom.nodeCT)
+						if not bOk and Debug and Debug.console then
+							Debug.console("StealthTracker: error in onNPCPostAdd: " .. tostring(sErr))
+						end
+					end
+					return vRet
+				end
+				CombatRecordManager.setRecordTypePostAddCallback("npc", _fNPCPostAddWrapper)
+			end
+		elseif CombatManager.getCustomAddNPC and CombatManager.setCustomAddNPC then
+			local fCurrent = CombatManager.getCustomAddNPC()
+			if fCurrent ~= _fCustomAddNPCWrapper then
+				_fPrevCustomAddNPC = fCurrent
+				_fCustomAddNPCWrapper = function(sClass, nodeNPC, sName, ...)
+					local nodeEntry
+					if _fPrevCustomAddNPC then
+						nodeEntry = _fPrevCustomAddNPC(sClass, nodeNPC, sName, ...)
+					elseif CombatManager.addNPCHelper then
+						nodeEntry = CombatManager.addNPCHelper(nodeNPC, sName)
+					end
+					if nodeEntry and isValidCTNode(nodeEntry) then
+						local bOk, sErr = pcall(ensureStealthSkillExistsOnNpc, nodeEntry)
+						if not bOk and Debug and Debug.console then
+							Debug.console("StealthTracker: error in CustomAddNPC: " .. tostring(sErr))
+						end
+					end
+					return nodeEntry
+				end
+				CombatManager.setCustomAddNPC(_fCustomAddNPCWrapper)
+			end
+		end
+
+		-- On FGC, Interface.onDesktopInit runs once the campaign DB & CT are initialized (FGU uses global onTabletopInit()).
+		if IS_FGC and Interface and Interface.onDesktopInit ~= _fDesktopInitWrapper then
+			_fPrevDesktopInit = Interface.onDesktopInit
+			_fDesktopInitWrapper = function()
+				if type(_fPrevDesktopInit) == "function" then
+					_fPrevDesktopInit()
+				end
+				populateExistingCTNpcs()
+			end
+			Interface.onDesktopInit = _fDesktopInitWrapper
+		end
 
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_UPDATESTEALTH, handleUpdateStealth)
 		OOBManager.registerOOBMsgHandler(OOB_MSGTYPE_ATTACKFROMSTEALTH, handleAttackFromStealth)
@@ -714,28 +781,128 @@ function doesTargetPerceiveAttackerFromStealth(nAttackerStealth, rTarget, rAttac
 	return nPPTarget >= nAttackerStealth
 end
 
+local function escapeLuaPattern(s)
+	return (s:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
+end
+
+local function hasStealthSkillInString(sSkills)
+	if isBlankSafe(sSkills) then return false end
+	local sTargetEsc = escapeLuaPattern(LOCALIZED_STEALTH_LOWER)
+	for sClause in sSkills:gmatch("[^,;\r\n]+") do
+		local sTrimmed = trimSafe(sClause):lower()
+		if sTrimmed:match("^" .. sTargetEsc .. "[^%a]") and sTrimmed:match("%d") then
+			return true
+		end
+	end
+	return false
+end
+
+local function refreshOpenNpcSkillsControl(wSub)
+	if not wSub then return false end
+	local cSkills = wSub.skills
+	if not cSkills then return false end
+
+	-- Reset cached multiroll character offsets so newly prepended Stealth rolls Stealth rather than the old first skill.
+	if type(cSkills.setParsed) == "function" then
+		cSkills.setParsed(false)
+	elseif type(cSkills.onChar) == "function" then
+		pcall(cSkills.onChar, 0)
+	end
+
+	if type(wSub.update) == "function" then
+		wSub.update()
+		return true
+	elseif WindowManager and WindowManager.getWindowReadOnlyState and type(wSub.onLockModeChanged) == "function" then
+		wSub.onLockModeChanged(WindowManager.getWindowReadOnlyState(wSub))
+		return true
+	end
+	return false
+end
+
+function refreshOpenNpcWindow(nodeCT)
+	if not nodeCT or not Interface or not Interface.findWindow then return end
+	local sPath = getNodePathSafe(nodeCT)
+	local wNpc = Interface.findWindow("npc", nodeCT)
+	if not wNpc and sPath then
+		wNpc = Interface.findWindow("npc", sPath)
+	end
+	if not wNpc then return end
+
+	-- 1. Modern FGU 5E (both 2024 and 2014 modes): npc -> main -> sub_content -> sub_bottom
+	if wNpc.main and wNpc.main.subwindow then
+		local wCombat = wNpc.main.subwindow
+		if refreshOpenNpcSkillsControl(wCombat) then return end
+		if wCombat.sub_content and wCombat.sub_content.subwindow then
+			local wEdition = wCombat.sub_content.subwindow
+			if refreshOpenNpcSkillsControl(wEdition) then return end
+			if wEdition.sub_bottom and wEdition.sub_bottom.subwindow then
+				if refreshOpenNpcSkillsControl(wEdition.sub_bottom.subwindow) then return end
+			end
+		end
+	end
+
+	-- 2. Legacy 5E / FGC: npc -> main_creature
+	if wNpc.main_creature and wNpc.main_creature.subwindow then
+		if refreshOpenNpcSkillsControl(wNpc.main_creature.subwindow) then return end
+	end
+
+	-- 3. Fallback
+	if type(wNpc.onLockChanged) == "function" then
+		wNpc.onLockChanged()
+	elseif type(wNpc.update) == "function" then
+		wNpc.update()
+	end
+end
+
+function populateExistingCTNpcs()
+	if not USER_ISHOST or not CombatManager then return end
+	local tNodes = nil
+	if CombatManager.getAllCombatantNodes then
+		tNodes = CombatManager.getAllCombatantNodes()
+	end
+	if (not tNodes or next(tNodes) == nil) and CombatManager.getCombatantNodes then
+		tNodes = CombatManager.getCombatantNodes()
+	end
+	for _, nodeCT in pairs(tNodes or {}) do
+		if isValidCTNode(nodeCT) then
+			local bOk, sErr = pcall(ensureStealthSkillExistsOnNpc, nodeCT)
+			if not bOk and Debug and Debug.console then
+				Debug.console("StealthTracker: error populating CT NPC: " .. tostring(sErr))
+			end
+		end
+	end
+end
+
+function onTabletopInit()
+	if not USER_ISHOST or IS_FGC then return end
+	populateExistingCTNpcs()
+end
+
 function ensureStealthSkillExistsOnNpc(nodeCT)
 	if not nodeCT then return end
 
 	local rCurrentActor = getActorSafe(nodeCT)
 	if not rCurrentActor or not isNpc(rCurrentActor) then return end
 
-	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
-	local nDexMod = getAbilityBonusSafe(nodeCT, DEXTERITY)
-	local sStealthWithMod = LOCALIZED_STEALTH .. " "
-	if nDexMod >= 0 then
-		sStealthWithMod = sStealthWithMod .. "+"
+	local sNpcType = DB.getText(nodeCT, "type", ""):lower()
+	if sNpcType:match("^%s*trap%s*$") or sNpcType:match("^%s*object%s*$") or isStealthTrackerDisabledForActor(nodeCT) then
+		return
 	end
 
-	sStealthWithMod = sStealthWithMod .. nDexMod -- Ex: Stealth +0 or Stealth -2
+	-- Consider the dex mod in any Stealth skill added to NPC sheet.  Bonus is always there, so chain.
+	local nDexMod = getAbilityBonusSafe(nodeCT, DEXTERITY)
+	local sStealthWithMod = LOCALIZED_STEALTH .. " " .. (nDexMod >= 0 and "+" or "") .. nDexMod -- Ex: Stealth +0 or Stealth -2
+
 	local sSkills = DB.getValue(nodeCT, "skills", "")
-	if sSkills == "" then
+	if isBlankSafe(sSkills) then
 		DB.setValue(nodeCT, "skills", "string", sStealthWithMod)
-	elseif not sSkills:lower():match(LOCALIZED_STEALTH_LOWER .. "%s+[+-]?%d") then
-		-- Prepend the zero Stealth bonus to the skills (didn't bother sorting which would require tokenization, table sort, and joining).
-		local sNewSkillsValue = sStealthWithMod .. ", " .. sSkills
+		pcall(refreshOpenNpcWindow, nodeCT)
+	elseif not hasStealthSkillInString(sSkills) then
+		-- Prepend the computed Stealth bonus to the existing skills list.
+		local sNewSkillsValue = sStealthWithMod .. ", " .. trimSafe(sSkills)
 		-- Trim off any trailing comma followed by zero or more whitespace.
 		DB.setValue(nodeCT, "skills", "string", sNewSkillsValue:gsub("^%s*(.-),%s*$", "%1"))
+		pcall(refreshOpenNpcWindow, nodeCT)
 	end
 end
 

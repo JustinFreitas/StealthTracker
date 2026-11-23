@@ -142,6 +142,7 @@ Install directly via the [Fantasy Grounds Forge](https://forge.fantasygrounds.co
 
 ### v5.8.1
 * **CoreRPG Initiative Sync Hardening (Nov 2026)**: Added `sInitSource = "turn"` on duration-2 fractional stealth effects during round and action-based expiration checks to maintain full compatibility with CoreRPG `ActorEffectManager.onInitResultUpdate` and prevent ruleset initiative synchronization from resetting fractional sub-turn offsets.
+* **Immediate NPC Stealth Skill Population & Live Sheet Refresh**: Hooked `CombatRecordManager` NPC post-add (with FGC `CombatManager.setCustomAddNPC` parity) and campaign load (`onTabletopInit` / `Interface.onDesktopInit`) so `Stealth +[DEX mod]` is populated as soon as an NPC enters the Combat Tracker rather than waiting for its first turn. Also refreshes already-open locked NPC sheets (including resetting cached multi-roll skill offsets across 2024/2014/FGC layouts) and supports en-dash negative skill modifiers (`Stealth –1`).
 
 ### v5.8
 * **Dice Tower & Secret Roll Privacy**: Stealth rolls made in the Dice Tower or secretly (`rRoll.bSecret` / `rRoll.bTower`, or secret chat rolls dragged onto the CT) now automatically mark the resulting `Stealth: X` effect as GM-only (`isgmonly = 1`) and suppress public chat announcements even when `Player: Show Stealth info` is set to `Effects` or `Chat and Effects`.
