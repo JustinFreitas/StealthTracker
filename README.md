@@ -140,6 +140,9 @@ Install directly via the [Fantasy Grounds Forge](https://forge.fantasygrounds.co
 
 ## Changelog
 
+### v5.8.2
+* **WIS Ability Effect Modifiers (CoreRPG / 5E Update)**: Updated `getAbilityEffectsBonusSafe(rActor, sAbility)` to check `ActorManagerD20.getAbilityEffectsBonus` (relocated from `ActorManager5E` in modern CoreRPG/5E) before falling back to `ActorManager5E.getAbilityEffectsBonus`, restoring WIS ability effect modifiers in Passive Perception calculations.
+
 ### v5.8.1
 * **CoreRPG Initiative Sync Hardening (Nov 2026)**: Added `sInitSource = "turn"` on duration-2 fractional stealth effects during round and action-based expiration checks (and restored the fractional `init` offset after `EffectManager.addEffect`) to maintain full compatibility with CoreRPG `ActorEffectManager.onInitResultUpdate` and `EffectVarManager.onEffectAddSetupInit`, preventing ruleset initiative synchronization from resetting fractional sub-turn offsets.
 * **Immediate NPC Stealth Skill Population & Live Sheet Refresh**: Hooked `CombatRecordManager` NPC post-add on FGU (with FGC `CombatManager.setCustomAddNPC` parity across single drops and Encounter placements) and campaign load (`onTabletopInit` on FGU / `Interface.onDesktopInit` on FGC) so `Stealth +[DEX mod]` is populated as soon as an NPC enters the Combat Tracker rather than waiting for its first turn. Also refreshes already-open locked NPC sheets (including resetting cached multi-roll skill offsets across 2024, 2014, and FGC layouts), supports en-dash negative skill modifiers (`Stealth –1`), and skips Traps/Objects regardless of faction.
