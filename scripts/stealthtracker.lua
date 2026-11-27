@@ -131,10 +131,13 @@ local function getEffectsBonusSafe(nodeActor, aEffectTypes, bFirstOnly, aFilter)
     return {}, 0, 0
 end
 
--- Helper to safely get ability effects bonus, preferring ActorManager5E if available.
-local function getAbilityEffectsBonusSafe(nodeActor, sAbility)
+-- Helper to safely get ability effects bonus, preferring CoreRPG ActorManagerD20 (modern 5E) then ActorManager5E (legacy).
+local function getAbilityEffectsBonusSafe(rActor, sAbility)
+    if ActorManagerD20 and ActorManagerD20.getAbilityEffectsBonus then
+        return ActorManagerD20.getAbilityEffectsBonus(rActor, sAbility)
+    end
     if ActorManager5E and ActorManager5E.getAbilityEffectsBonus then
-        return ActorManager5E.getAbilityEffectsBonus(nodeActor, sAbility)
+        return ActorManager5E.getAbilityEffectsBonus(rActor, sAbility)
     end
     return 0, 0
 end

@@ -2107,6 +2107,40 @@ async function runTests() {
                 end
             end
 
+            -- 4. Ability effects bonus in getAdvDisadvForPerception (ActorManagerD20 primary + ActorManager5E legacy fallback)
+            do
+                local fSavedD20 = ActorManagerD20
+                local fSaved5EBonus = ActorManager5E.getAbilityEffectsBonus
+                local mockPC = createMockNode({ recordType = "pc", abilities = { wisdom = { score = 10, bonus = 0 } } })
+
+                -- 4a. Modern 5E/CoreRPG: ActorManagerD20.getAbilityEffectsBonus
+                ActorManagerD20 = {
+                    getAbilityEffectsBonus = function(rActor, sAbility)
+                        if sAbility == "wisdom" then return 2, 1 end
+                        return 0, 0
+                    end
+                }
+                ActorManager5E.getAbilityEffectsBonus = function() return 99, 1 end
+                local _, _, nModD20 = getAdvDisadvForPerception(mockPC)
+                if nModD20 ~= 2 then
+                    fail("Expected ActorManagerD20.getAbilityEffectsBonus to yield nAddMod=2, got " .. tostring(nModD20))
+                end
+
+                -- 4b. Legacy fallback: ActorManager5E.getAbilityEffectsBonus when ActorManagerD20 is absent
+                ActorManagerD20 = nil
+                ActorManager5E.getAbilityEffectsBonus = function(rActor, sAbility)
+                    if sAbility == "wisdom" then return -3, 1 end
+                    return 0, 0
+                end
+                local _, _, nMod5E = getAdvDisadvForPerception(mockPC)
+                if nMod5E ~= -3 then
+                    fail("Expected legacy ActorManager5E.getAbilityEffectsBonus fallback to yield nAddMod=-3, got " .. tostring(nMod5E))
+                end
+
+                ActorManagerD20 = fSavedD20
+                ActorManager5E.getAbilityEffectsBonus = fSaved5EBonus
+            end
+
             return table.concat(failures, "; ")
         `
     );

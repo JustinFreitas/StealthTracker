@@ -1,6 +1,6 @@
 {
   "name": "stealthtracker",
-  "version": "5.8.1",
+  "version": "5.8.2",
   "description": "https://github.com/JustinFreitas/StealthTracker",
   "main": "index.js",
   "directories": {
